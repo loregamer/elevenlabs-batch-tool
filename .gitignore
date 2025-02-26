@@ -1,1 +1,7 @@
 /__pycache__
+/.env
+/dist
+/build
+*.spec
+/dist_package
+*.zip
