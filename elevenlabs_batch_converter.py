@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QComboBox, QFileDialog, QListWidget,
     QProgressBar, QMessageBox, QGroupBox, QListWidgetItem, QStyle,
-    QSplitter, QFrame, QLineEdit, QFormLayout
+    QSplitter, QFrame, QLineEdit, QFormLayout, QCheckBox
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize
 from PyQt6.QtGui import QIcon, QFont
@@ -25,11 +25,14 @@ class ConversionWorker(QThread):
     conversion_complete = pyqtSignal(str, bool)  # (file_path, success)
     conversion_finished = pyqtSignal()  # All conversions complete
     
-    def __init__(self, api, voice_id, file_list):
+    def __init__(self, api, voice_id, file_list, model_id, speaker_boost, remove_background_noise):
         super().__init__()
         self.api = api
         self.voice_id = voice_id
         self.file_list = file_list
+        self.model_id = model_id
+        self.speaker_boost = speaker_boost
+        self.remove_background_noise = remove_background_noise
         self.is_cancelled = False
     
     def run(self):
@@ -55,7 +58,10 @@ class ConversionWorker(QThread):
                 # Convert the file
                 audio_data = self.api.convert_speech_to_speech(
                     voice_id=self.voice_id,
-                    audio_file_path=file_path
+                    audio_file_path=file_path,
+                    model_id=self.model_id,
+                    speaker_boost=self.speaker_boost,
+                    remove_background_noise=self.remove_background_noise
                 )
                 
                 if audio_data:
@@ -188,6 +194,23 @@ class ElevenLabsBatchConverter(QMainWindow):
         voice_layout.addWidget(QLabel("Select Voice:"))
         self.voice_combo = QComboBox()
         voice_layout.addWidget(self.voice_combo)
+        
+        # Add model selection
+        voice_layout.addWidget(QLabel("Select Model:"))
+        self.model_combo = QComboBox()
+        voice_layout.addWidget(self.model_combo)
+        
+        # Add speaker boost option
+        self.speaker_boost_checkbox = QCheckBox("Speaker Boost")
+        self.speaker_boost_checkbox.setChecked(True)  # Default to enabled
+        self.speaker_boost_checkbox.setToolTip("Enhance the target speaker's voice")
+        voice_layout.addWidget(self.speaker_boost_checkbox)
+        
+        # Add background noise removal option
+        self.remove_noise_checkbox = QCheckBox("Remove Silence")
+        self.remove_noise_checkbox.setChecked(False)  # Default to disabled
+        self.remove_noise_checkbox.setToolTip("Remove silence and background noise from the audio")
+        voice_layout.addWidget(self.remove_noise_checkbox)
         
         self.refresh_voices_btn = QPushButton("Refresh Voices")
         self.refresh_voices_btn.clicked.connect(self.load_voices)
@@ -345,6 +368,7 @@ class ElevenLabsBatchConverter(QMainWindow):
         QApplication.processEvents()
         
         try:
+            # Load voices
             self.voices = self.api.get_voice_options()
             self.voice_combo.clear()
             
@@ -354,8 +378,14 @@ class ElevenLabsBatchConverter(QMainWindow):
                 
             for voice in self.voices:
                 self.voice_combo.addItem(voice["name"], voice["id"])
+            
+            # Load models
+            self.model_combo.clear()
+            models = self.api.get_model_options()
+            for model in models:
+                self.model_combo.addItem(model["name"], model["id"])
                 
-            self.status_label.setText(f"Loaded {len(self.voices)} voices")
+            self.status_label.setText(f"Loaded {len(self.voices)} voices and {len(models)} models")
             
             # Update credits display after loading voices
             self.update_credits_display()
@@ -406,6 +436,13 @@ class ElevenLabsBatchConverter(QMainWindow):
         # Get the selected voice ID
         voice_id = self.voice_combo.currentData()
         
+        # Get the selected model ID
+        model_id = self.model_combo.currentData()
+        
+        # Get the speaker boost and noise removal settings
+        speaker_boost = self.speaker_boost_checkbox.isChecked()
+        remove_background_noise = self.remove_noise_checkbox.isChecked()
+        
         # Get all file paths from the list
         file_paths = [self.file_list.item(i).data(Qt.ItemDataRole.UserRole) 
                       for i in range(self.file_list.count())]
@@ -421,11 +458,21 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.remove_file_btn.setEnabled(False)
         self.clear_files_btn.setEnabled(False)
         self.voice_combo.setEnabled(False)
+        self.model_combo.setEnabled(False)
+        self.speaker_boost_checkbox.setEnabled(False)
+        self.remove_noise_checkbox.setEnabled(False)
         self.refresh_voices_btn.setEnabled(False)
         self.cancel_btn.setEnabled(True)
         
         # Create and start worker thread
-        self.worker = ConversionWorker(self.api, voice_id, file_paths)
+        self.worker = ConversionWorker(
+            self.api, 
+            voice_id, 
+            file_paths,
+            model_id,
+            speaker_boost,
+            remove_background_noise
+        )
         self.worker.progress_updated.connect(self.update_progress)
         self.worker.conversion_complete.connect(self.add_conversion_result)
         self.worker.conversion_finished.connect(self.conversion_finished)
@@ -461,31 +508,53 @@ class ElevenLabsBatchConverter(QMainWindow):
     
     def conversion_finished(self):
         """Handle completion of all conversions."""
-        self.progress_bar.setValue(self.progress_bar.maximum())
-        self.status_label.setText("Conversion complete!")
+        # Set progress bar to 100%
+        self.progress_bar.setValue(100)
         
-        # Re-enable controls
+        # Re-enable UI elements
         self.start_btn.setEnabled(True)
-        self.cancel_btn.setEnabled(False)
         self.add_files_btn.setEnabled(True)
         self.remove_file_btn.setEnabled(True)
         self.clear_files_btn.setEnabled(True)
         self.voice_combo.setEnabled(True)
+        self.model_combo.setEnabled(True)
+        self.speaker_boost_checkbox.setEnabled(True)
+        self.remove_noise_checkbox.setEnabled(True)
         self.refresh_voices_btn.setEnabled(True)
+        
+        self.cancel_btn.setEnabled(False)
         
         # Update credits display after conversion
         self.update_credits_display()
         
-        # Show a message box with the results
+        # Count successful and failed conversions
         success_count = 0
+        failed_count = 0
+        
         for i in range(self.results_list.count()):
-            if "✓" in self.results_list.item(i).text():
+            item = self.results_list.item(i)
+            if item.data(Qt.ItemDataRole.UserRole):  # True for success
                 success_count += 1
+            else:
+                failed_count += 1
         
-        failed = self.results_list.count() - success_count
-        
-        message = f"Conversion complete!\n\n{success_count} files converted successfully.\n{failed} files failed."
-        QMessageBox.information(self, "Conversion Complete", message)
+        # Update status
+        if failed_count == 0:
+            self.status_label.setText(f"Conversion complete! {success_count} files converted successfully.")
+        else:
+            self.status_label.setText(
+                f"Conversion complete with issues. {success_count} succeeded, {failed_count} failed."
+            )
+            
+        # Show a message box with the results
+        QMessageBox.information(
+            self,
+            "Conversion Complete",
+            f"Conversion process finished.\n\n"
+            f"Successfully converted: {success_count} files\n"
+            f"Failed conversions: {failed_count} files\n\n"
+            f"Output files are saved in the 'output' folder."
+        )
         
         # Clean up the worker
         if self.worker:

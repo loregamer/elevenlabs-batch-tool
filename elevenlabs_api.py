@@ -78,13 +78,19 @@ class ElevenLabsAPI:
             self.logger.error(f"Unexpected error while fetching subscription info: {e}")
             return None
     
-    def convert_speech_to_speech(self, voice_id, audio_file_path, output_format="mp3_44100_128"):
+    def convert_speech_to_speech(self, voice_id, audio_file_path, model_id="eleven_multilingual_sts_v2", 
+                                speaker_boost=True, remove_background_noise=False, output_format="mp3_44100_128"):
         """
         Convert speech in an audio file to speech with a different voice.
         
         Args:
             voice_id (str): The ID of the target voice to use
             audio_file_path (str): Path to the audio file to convert
+            model_id (str): The model to use for conversion. Options:
+                           "eleven_multilingual_sts_v2" (default) - Multilingual model
+                           "eleven_english_sts_v2" - English-only model
+            speaker_boost (bool): Whether to enhance the target speaker's voice (default: True)
+            remove_background_noise (bool): Whether to remove background noise (default: False)
             output_format (str): Desired output format
             
         Returns:
@@ -98,16 +104,19 @@ class ElevenLabsAPI:
                 "audio": open(audio_file_path, "rb")
             }
             
+            # According to ElevenLabs API, the parameter is called "remove_silence"
             data = {
-                "model_id": "eleven_multilingual_sts_v2",  # Use the Speech-to-Speech model
-                "output_format": output_format
+                "model_id": model_id,
+                "output_format": output_format,
+                "speaker_boost": speaker_boost,
+                "remove_silence": remove_background_noise  # API parameter name is different from our method parameter
             }
             
             # Need to remove the accept header for binary response
             headers = self.headers.copy()
             headers["accept"] = "audio/mpeg"
             
-            self.logger.info(f"Converting file: {audio_file_path}")
+            self.logger.info(f"Converting file: {audio_file_path} with model: {model_id}, speaker_boost: {speaker_boost}, remove_silence: {remove_background_noise}")
             response = requests.post(url, headers=headers, data=data, files=files)
             
             # Close the file
@@ -118,13 +127,13 @@ class ElevenLabsAPI:
             
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Error converting speech: {e}")
-            if response.content:
+            if 'response' in locals() and response.content:
                 self.logger.error(f"Error details: {response.content.decode('utf-8', errors='ignore')}")
             return None
         except Exception as e:
             self.logger.error(f"Unexpected error: {e}")
             return None
-            
+    
     def get_voice_options(self):
         """Get a list of voices with their IDs and names for display in UI."""
         voices_data = self.get_voices()
@@ -139,6 +148,21 @@ class ElevenLabsAPI:
                 })
                 
         return options
+    
+    def get_model_options(self):
+        """Get a list of available models for speech-to-speech conversion."""
+        return [
+            {
+                "id": "eleven_multilingual_sts_v2",
+                "name": "Eleven Multilingual v2",
+                "description": "Supports multiple languages"
+            },
+            {
+                "id": "eleven_english_sts_v2",
+                "name": "Eleven English v2",
+                "description": "Optimized for English language"
+            }
+        ]
 
 # Testing code
 if __name__ == "__main__":
@@ -156,4 +180,10 @@ if __name__ == "__main__":
     voices = api.get_voice_options()
     print(f"\nFound {len(voices)} voices:")
     for voice in voices[:5]:  # Show first 5 voices
-        print(f"ID: {voice['id']}, Name: {voice['name']}") 
+        print(f"ID: {voice['id']}, Name: {voice['name']}")
+    
+    # Test getting models
+    models = api.get_model_options()
+    print(f"\nAvailable models:")
+    for model in models:
+        print(f"ID: {model['id']}, Name: {model['name']}") 
