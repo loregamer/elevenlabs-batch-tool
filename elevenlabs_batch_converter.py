@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize
 from PyQt6.QtGui import QIcon, QFont
-from dotenv import load_dotenv, set_key
+import keyring
 
 from elevenlabs_api import ElevenLabsAPI
 
@@ -18,6 +18,10 @@ from elevenlabs_api import ElevenLabsAPI
 logging.basicConfig(level=logging.INFO, 
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("BatchConverter")
+
+# Constants for keyring
+APP_NAME = "ElevenLabsBatchConverter"
+KEY_NAME = "ElevenLabsAPIKey"
 
 class ConversionWorker(QThread):
     """Worker thread to handle audio conversion without blocking the UI."""
@@ -99,9 +103,10 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.api = None
         self.worker = None
         self.voices = []
-        # Load environment variables to get API key if it exists
-        load_dotenv()
-        self.api_key = os.getenv("ELEVENLABS_API_KEY", "")
+        
+        # Try to get API key from keyring
+        self.api_key = keyring.get_password(APP_NAME, KEY_NAME) or ""
+        
         self.init_ui()
         
     def init_ui(self):
@@ -305,7 +310,7 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.open_output_btn.clicked.connect(self.open_output_folder)
         main_layout.addWidget(self.open_output_btn)
         
-        # If we already have an API key from .env, connect automatically
+        # If we already have an API key from keyring, connect automatically
         if self.api_key:
             self.connect_api()
     
@@ -317,23 +322,17 @@ class ElevenLabsBatchConverter(QMainWindow):
             self.api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
     
     def save_api_key(self):
-        """Save the current API key to the .env file."""
+        """Save the current API key securely to the system keyring."""
         api_key = self.api_key_input.text().strip()
         if not api_key:
             QMessageBox.warning(self, "Empty API Key", "Please enter an API key to save.")
             return
         
         try:
-            # Check if .env file exists, if not create it
-            env_path = Path('.env')
-            if not env_path.exists():
-                env_path.touch()
+            # Save the API key to the system keyring
+            keyring.set_password(APP_NAME, KEY_NAME, api_key)
             
-            # Save the API key to the .env file
-            with open(env_path, 'w') as f:
-                f.write(f"ELEVENLABS_API_KEY={api_key}")
-            
-            QMessageBox.information(self, "Success", "API key saved to .env file successfully!")
+            QMessageBox.information(self, "Success", "API key saved securely to your system!")
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save API key: {str(e)}")

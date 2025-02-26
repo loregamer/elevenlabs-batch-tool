@@ -10,6 +10,7 @@ A GUI tool for batch processing audio files using ElevenLabs' voice conversion t
 - Track conversion progress
 - Save converted files to your chosen location
 - Enter your API key directly in the application
+- Securely store your API key in your system's credential manager
 
 ## Requirements
 
@@ -31,7 +32,7 @@ A GUI tool for batch processing audio files using ElevenLabs' voice conversion t
    python elevenlabs_batch_converter.py
    ```
 2. Enter your ElevenLabs API key and click "Connect"
-   - You can click "Save Key" to store your API key for future use
+   - You can click "Save Key" to securely store your API key in your system's credential manager
 3. Click "Add Files" to select audio files for conversion
 4. Choose an ElevenLabs voice model from the dropdown
 5. Click "Start Conversion" to begin the batch process
@@ -42,7 +43,7 @@ A GUI tool for batch processing audio files using ElevenLabs' voice conversion t
 - This tool uses the ElevenLabs Speech-to-Speech API to change the voice in audio files
 - Processing large files consumes more API credits
 - Conversion time depends on file size and internet connection
-- You can save your API key to avoid entering it every time
+- Your API key is securely stored in your system's credential manager (Windows Credential Manager, macOS Keychain, or Linux Secret Service)
 
 ## If Python randomly breaks
 

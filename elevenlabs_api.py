@@ -1,11 +1,12 @@
 import os
 import requests
-from dotenv import load_dotenv
 import logging
 import json
+import keyring
 
-# Load environment variables
-load_dotenv()
+# Constants for keyring (must match those in elevenlabs_batch_converter.py)
+APP_NAME = "ElevenLabsBatchConverter"
+KEY_NAME = "ElevenLabsAPIKey"
 
 class ElevenLabsAPI:
     """A class to interact with the ElevenLabs API for voice conversion."""
@@ -13,10 +14,11 @@ class ElevenLabsAPI:
     BASE_URL = "https://api.elevenlabs.io/v1"
     
     def __init__(self, api_key=None):
-        """Initialize the API with a key from environment or parameter."""
-        self.api_key = api_key or os.getenv("ELEVENLABS_API_KEY")
+        """Initialize the API with a key from parameter, keyring, or environment."""
+        # Priority: 1. Passed api_key, 2. Keyring, 3. Environment variable
+        self.api_key = api_key or keyring.get_password(APP_NAME, KEY_NAME) or os.getenv("ELEVENLABS_API_KEY")
         if not self.api_key:
-            raise ValueError("ElevenLabs API key is required. Set it in .env file or pass to constructor.")
+            raise ValueError("ElevenLabs API key is required. Please provide an API key.")
         
         self.headers = {
             "xi-api-key": self.api_key,
