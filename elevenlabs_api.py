@@ -38,6 +38,46 @@ class ElevenLabsAPI:
             self.logger.error(f"Error fetching voices: {e}")
             return {"voices": []}
     
+    def get_remaining_credits(self):
+        """
+        Get the remaining credits in the user's subscription.
+        
+        Returns:
+            dict: A dictionary containing subscription information including remaining credits
+                  or None if the request fails
+        """
+        try:
+            url = f"{self.BASE_URL}/user/subscription"
+            response = requests.get(url, headers=self.headers)
+            response.raise_for_status()
+            
+            subscription_data = response.json()
+            
+            # Extract the relevant credit information
+            credits_info = {
+                "character_count": subscription_data.get("character_count", 0),
+                "character_limit": subscription_data.get("character_limit", 0),
+                "remaining_characters": 0,
+                "tier": subscription_data.get("tier", ""),
+                "next_character_count_reset_unix": subscription_data.get("next_character_count_reset_unix", 0)
+            }
+            
+            # Calculate remaining characters
+            if "character_count" in subscription_data and "character_limit" in subscription_data:
+                credits_info["remaining_characters"] = subscription_data["character_limit"] - subscription_data["character_count"]
+            
+            self.logger.info(f"Remaining credits: {credits_info['remaining_characters']} characters")
+            return credits_info
+            
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"Error fetching subscription info: {e}")
+            if 'response' in locals() and response.content:
+                self.logger.error(f"Error details: {response.content.decode('utf-8', errors='ignore')}")
+            return None
+        except Exception as e:
+            self.logger.error(f"Unexpected error while fetching subscription info: {e}")
+            return None
+    
     def convert_speech_to_speech(self, voice_id, audio_file_path, output_format="mp3_44100_128"):
         """
         Convert speech in an audio file to speech with a different voice.
@@ -103,7 +143,17 @@ class ElevenLabsAPI:
 # Testing code
 if __name__ == "__main__":
     api = ElevenLabsAPI()
+    
+    # Test getting remaining credits
+    credits = api.get_remaining_credits()
+    if credits:
+        print(f"Subscription tier: {credits['tier']}")
+        print(f"Character limit: {credits['character_limit']}")
+        print(f"Used characters: {credits['character_count']}")
+        print(f"Remaining characters: {credits['remaining_characters']}")
+    
+    # Test getting voices
     voices = api.get_voice_options()
-    print(f"Found {len(voices)} voices:")
+    print(f"\nFound {len(voices)} voices:")
     for voice in voices[:5]:  # Show first 5 voices
         print(f"ID: {voice['id']}, Name: {voice['name']}") 

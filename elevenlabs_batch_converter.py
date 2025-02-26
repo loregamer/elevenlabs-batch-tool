@@ -135,6 +135,14 @@ class ElevenLabsBatchConverter(QMainWindow):
         api_key_buttons.addWidget(self.save_key_btn)
         
         api_key_layout.addRow("", api_key_buttons)
+        
+        # Add credits display
+        self.credits_label = QLabel("Credits: Not connected")
+        credits_font = QFont()
+        credits_font.setBold(True)
+        self.credits_label.setFont(credits_font)
+        api_key_layout.addRow("", self.credits_label)
+        
         main_layout.addWidget(api_key_group)
         
         # Split the UI into left and right panels
@@ -277,6 +285,11 @@ class ElevenLabsBatchConverter(QMainWindow):
         try:
             # Initialize API with the provided key
             self.api = ElevenLabsAPI(api_key=api_key)
+            
+            # Update credits display
+            self.update_credits_display()
+            
+            # Load voices
             self.load_voices()
             
             # Enable controls that require the API
@@ -288,6 +301,40 @@ class ElevenLabsBatchConverter(QMainWindow):
             QMessageBox.critical(self, "API Key Error", 
                                f"Error initializing ElevenLabs API: {str(e)}")
             self.status_label.setText("API connection failed. Check your key.")
+    
+    def update_credits_display(self):
+        """Update the credits display with current information from the API."""
+        if not self.api:
+            self.credits_label.setText("Credits: Not connected")
+            return
+            
+        try:
+            credits_info = self.api.get_remaining_credits()
+            if credits_info:
+                # Format the credits display
+                tier = credits_info.get("tier", "Unknown")
+                used = credits_info.get("character_count", 0)
+                limit = credits_info.get("character_limit", 0)
+                remaining = credits_info.get("remaining_characters", 0)
+                
+                # Create a formatted string with the credits information
+                credits_text = f"Credits: {remaining:,} / {limit:,} characters remaining ({tier} tier)"
+                self.credits_label.setText(credits_text)
+                
+                # Change color based on remaining credits
+                if remaining < limit * 0.1:  # Less than 10% remaining
+                    self.credits_label.setStyleSheet("color: red;")
+                elif remaining < limit * 0.25:  # Less than 25% remaining
+                    self.credits_label.setStyleSheet("color: orange;")
+                else:
+                    self.credits_label.setStyleSheet("color: green;")
+            else:
+                self.credits_label.setText("Credits: Unable to retrieve")
+                self.credits_label.setStyleSheet("")
+        except Exception as e:
+            logger.error(f"Error updating credits display: {str(e)}")
+            self.credits_label.setText("Credits: Error retrieving")
+            self.credits_label.setStyleSheet("")
     
     def load_voices(self):
         """Load available voices from the API."""
@@ -309,6 +356,9 @@ class ElevenLabsBatchConverter(QMainWindow):
                 self.voice_combo.addItem(voice["name"], voice["id"])
                 
             self.status_label.setText(f"Loaded {len(self.voices)} voices")
+            
+            # Update credits display after loading voices
+            self.update_credits_display()
             
         except Exception as e:
             self.status_label.setText(f"Error loading voices: {str(e)}")
@@ -410,32 +460,37 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.results_list.addItem(item)
     
     def conversion_finished(self):
-        """Handle completion of the conversion process."""
-        success_count = 0
-        for i in range(self.results_list.count()):
-            if "✓" in self.results_list.item(i).text():
-                success_count += 1
-        
-        self.status_label.setText(f"Conversion complete. {success_count}/{self.results_list.count()} files succeeded.")
+        """Handle completion of all conversions."""
+        self.progress_bar.setValue(self.progress_bar.maximum())
+        self.status_label.setText("Conversion complete!")
         
         # Re-enable controls
         self.start_btn.setEnabled(True)
+        self.cancel_btn.setEnabled(False)
         self.add_files_btn.setEnabled(True)
         self.remove_file_btn.setEnabled(True)
         self.clear_files_btn.setEnabled(True)
         self.voice_combo.setEnabled(True)
         self.refresh_voices_btn.setEnabled(True)
-        self.cancel_btn.setEnabled(False)
         
-        # Show completion message
-        QMessageBox.information(
-            self, 
-            "Conversion Complete", 
-            f"Conversion process finished.\n\n"
-            f"Successfully converted: {success_count}\n"
-            f"Failed: {self.results_list.count() - success_count}\n\n"
-            f"Converted files are saved in the 'output' folder."
-        )
+        # Update credits display after conversion
+        self.update_credits_display()
+        
+        # Show a message box with the results
+        success_count = 0
+        for i in range(self.results_list.count()):
+            if "✓" in self.results_list.item(i).text():
+                success_count += 1
+        
+        failed = self.results_list.count() - success_count
+        
+        message = f"Conversion complete!\n\n{success_count} files converted successfully.\n{failed} files failed."
+        QMessageBox.information(self, "Conversion Complete", message)
+        
+        # Clean up the worker
+        if self.worker:
+            self.worker.deleteLater()
+            self.worker = None
     
     def open_output_folder(self):
         """Open the output folder in file explorer."""
