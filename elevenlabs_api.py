@@ -1,7 +1,11 @@
 import os
 import requests
+from dotenv import load_dotenv
 import logging
 import json
+
+# Load environment variables
+load_dotenv()
 
 class ElevenLabsAPI:
     """A class to interact with the ElevenLabs API for voice conversion."""
@@ -9,10 +13,10 @@ class ElevenLabsAPI:
     BASE_URL = "https://api.elevenlabs.io/v1"
     
     def __init__(self, api_key=None):
-        """Initialize the API with a key from parameter."""
-        self.api_key = api_key
+        """Initialize the API with a key from environment or parameter."""
+        self.api_key = api_key or os.getenv("ELEVENLABS_API_KEY")
         if not self.api_key:
-            raise ValueError("ElevenLabs API key is required. Pass it to the constructor.")
+            raise ValueError("ElevenLabs API key is required. Set it in .env file or pass to constructor.")
         
         self.headers = {
             "xi-api-key": self.api_key,
