@@ -74,17 +74,6 @@ If you want to customize the build process:
 1. Edit the `elevenlabs_batch_converter.spec` file to change PyInstaller settings
 2. Edit the `package_for_distribution.py` file to change what's included in the distribution package
 
-### Using a .env File
-
-You can create a `.env` file in the project directory to include your ElevenLabs API key in the executable:
-
-1. Create a file named `.env` in the project directory
-2. Add your API key in the format: `ELEVENLABS_API_KEY=your_api_key_here`
-3. When you build the executable, this file will be included
-4. Users won't need to enter an API key when they first run the application
-
-Note: If you don't create a `.env` file, the build process will create an empty one automatically.
-
 ## Troubleshooting
 
 ### Common Build Issues
