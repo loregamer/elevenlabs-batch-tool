@@ -1,12 +1,18 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
 
 block_cipher = None
+
+# Check if .env exists and only include it if it does
+datas_list = []
+if os.path.exists('.env'):
+    datas_list.append(('.env', '.'))
 
 a = Analysis(
     ['elevenlabs_batch_converter.py'],
     pathex=[],
     binaries=[],
-    datas=[('.env', '.')],
+    datas=datas_list,
     hiddenimports=[
         'PyQt6.QtCore',
         'PyQt6.QtWidgets',
