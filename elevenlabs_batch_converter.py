@@ -9,8 +9,9 @@ from PyQt6.QtWidgets import (
     QSplitter, QFrame, QLineEdit, QFormLayout, QCheckBox, QSlider
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize
-from PyQt6.QtGui import QIcon, QFont
+from PyQt6.QtGui import QIcon, QFont, QColor
 import keyring
+import qtawesome as qta
 
 from elevenlabs_api import ElevenLabsAPI
 
@@ -119,6 +120,35 @@ class ElevenLabsBatchConverter(QMainWindow):
         main_layout = QVBoxLayout(main_widget)
         self.setCentralWidget(main_widget)
         
+        # Set application style
+        self.setStyleSheet("""
+            QPushButton {
+                padding: 5px;
+                border-radius: 4px;
+                background-color: #2c3e50;
+                color: white;
+            }
+            QPushButton:hover {
+                background-color: #34495e;
+            }
+            QPushButton:disabled {
+                background-color: #7f8c8d;
+                color: #bdc3c7;
+            }
+            QGroupBox {
+                font-weight: bold;
+                border: 1px solid #bdc3c7;
+                border-radius: 5px;
+                margin-top: 1ex;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top center;
+                padding: 0 5px;
+            }
+        """)
+        
         # Title
         title_label = QLabel("ElevenLabs Batch Voice Converter")
         title_font = QFont()
@@ -141,14 +171,17 @@ class ElevenLabsBatchConverter(QMainWindow):
         api_key_buttons = QHBoxLayout()
         
         self.toggle_visibility_btn = QPushButton("Show/Hide Key")
+        self.toggle_visibility_btn = self.style_button(self.toggle_visibility_btn, 'fa5s.eye', "Show/Hide Key")
         self.toggle_visibility_btn.clicked.connect(self.toggle_api_key_visibility)
         api_key_buttons.addWidget(self.toggle_visibility_btn)
         
         self.connect_api_btn = QPushButton("Connect")
+        self.connect_api_btn = self.style_button(self.connect_api_btn, 'fa5s.plug', "Connect")
         self.connect_api_btn.clicked.connect(self.connect_api)
         api_key_buttons.addWidget(self.connect_api_btn)
         
         self.save_key_btn = QPushButton("Save Key")
+        self.save_key_btn = self.style_button(self.save_key_btn, 'fa5s.save', "Save Key")
         self.save_key_btn.clicked.connect(self.save_api_key)
         api_key_buttons.addWidget(self.save_key_btn)
         
@@ -181,14 +214,17 @@ class ElevenLabsBatchConverter(QMainWindow):
         # File buttons
         file_buttons = QHBoxLayout()
         self.add_files_btn = QPushButton("Add Files")
+        self.add_files_btn = self.style_button(self.add_files_btn, 'fa5s.file-audio', "Add Files")
         self.add_files_btn.clicked.connect(self.add_files)
         file_buttons.addWidget(self.add_files_btn)
         
         self.remove_file_btn = QPushButton("Remove Selected")
+        self.remove_file_btn = self.style_button(self.remove_file_btn, 'fa5s.trash-alt', "Remove Selected")
         self.remove_file_btn.clicked.connect(self.remove_selected_file)
         file_buttons.addWidget(self.remove_file_btn)
         
         self.clear_files_btn = QPushButton("Clear All")
+        self.clear_files_btn = self.style_button(self.clear_files_btn, 'fa5s.times-circle', "Clear All")
         self.clear_files_btn.clicked.connect(self.clear_files)
         file_buttons.addWidget(self.clear_files_btn)
         
@@ -261,6 +297,7 @@ class ElevenLabsBatchConverter(QMainWindow):
         voice_layout.addWidget(self.remove_noise_checkbox)
         
         self.refresh_voices_btn = QPushButton("Refresh Voices")
+        self.refresh_voices_btn = self.style_button(self.refresh_voices_btn, 'fa5s.sync', "Refresh Voices")
         self.refresh_voices_btn.clicked.connect(self.load_voices)
         voice_layout.addWidget(self.refresh_voices_btn)
         
@@ -288,11 +325,13 @@ class ElevenLabsBatchConverter(QMainWindow):
         control_buttons = QHBoxLayout()
         
         self.start_btn = QPushButton("Start Conversion")
+        self.start_btn = self.style_button(self.start_btn, 'fa5s.play', "Start Conversion")
         self.start_btn.clicked.connect(self.start_conversion)
         self.start_btn.setEnabled(False)  # Disabled until API connected
         control_buttons.addWidget(self.start_btn)
         
         self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn = self.style_button(self.cancel_btn, 'fa5s.stop', "Cancel")
         self.cancel_btn.clicked.connect(self.cancel_conversion)
         self.cancel_btn.setEnabled(False)
         control_buttons.addWidget(self.cancel_btn)
@@ -307,6 +346,7 @@ class ElevenLabsBatchConverter(QMainWindow):
         
         # Open output folder button
         self.open_output_btn = QPushButton("Open Output Folder")
+        self.open_output_btn = self.style_button(self.open_output_btn, 'fa5s.folder-open', "Open Output Folder")
         self.open_output_btn.clicked.connect(self.open_output_folder)
         main_layout.addWidget(self.open_output_btn)
         
@@ -314,12 +354,22 @@ class ElevenLabsBatchConverter(QMainWindow):
         if self.api_key:
             self.connect_api()
     
+    def style_button(self, button, icon_name, tooltip=""):
+        """Apply a consistent style to a button with an icon."""
+        button.setIcon(qta.icon(icon_name, color='white'))
+        button.setIconSize(QSize(16, 16))
+        if tooltip:
+            button.setToolTip(tooltip)
+        return button
+    
     def toggle_api_key_visibility(self):
         """Toggle between showing and hiding the API key."""
         if self.api_key_input.echoMode() == QLineEdit.EchoMode.Password:
             self.api_key_input.setEchoMode(QLineEdit.EchoMode.Normal)
+            self.toggle_visibility_btn.setIcon(self.style_button(QPushButton(), 'fa5s.eye-slash').icon())
         else:
             self.api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
+            self.toggle_visibility_btn.setIcon(self.style_button(QPushButton(), 'fa5s.eye').icon())
     
     def save_api_key(self):
         """Save the current API key securely to the system keyring."""
@@ -643,6 +693,11 @@ def main():
     """Main application entry point."""
     app = QApplication(sys.argv)
     app.setStyle("Fusion")  # Use Fusion style for a modern look
+    
+    # Set application icon
+    app_icon = qta.icon('fa5s.microphone-alt', color='#3498db')
+    app.setWindowIcon(app_icon)
+    
     window = ElevenLabsBatchConverter()
     window.show()
     sys.exit(app.exec())
