@@ -43,7 +43,6 @@ A GUI tool for batch processing audio files using ElevenLabs' voice conversion t
 - Processing large files consumes more API credits
 - Conversion time depends on file size and internet connection
 - You can save your API key to avoid entering it every time
-- You can also store your API key in a `.env` file with the format: `ELEVENLABS_API_KEY=your_api_key_here`
 
 ## Building as an Executable
 
