@@ -1,0 +1,190 @@
+---
+description: A comprehensive guide to ElevenLabs AI audio capabilities, APIs, and features
+globs: 
+alwaysApply: false
+---
+# ElevenLabs Documentation Overview
+## Introduction
+
+ElevenLabs is an AI audio research and deployment company providing state-of-the-art voice synthesis, voice transformation, and conversational AI technologies. This overview combines key information from across the documentation to provide a complete picture of ElevenLabs' capabilities and how to use them.
+
+## Core Capabilities
+
+### Text to Speech
+
+ElevenLabs Text to Speech (TTS) technology converts written text into lifelike spoken audio with nuanced intonation, pacing, and emotional awareness. The TTS API supports:
+
+- 32+ languages with natural-sounding pronunciation
+- Thousands of voice options through various creation methods
+- Emotional context interpretation from text cues
+- Multiple audio formats and quality levels
+
+**Key features:**
+- High-quality audio synthesis with the Multilingual v2 model
+- Ultra-low latency (75ms) with the Flash v2.5 model 
+- Various output formats including MP3, PCM, and μ-law
+- Customizable voice parameters for stability and similarity
+
+### Voice Options
+
+ElevenLabs provides multiple ways to access and create voices:
+
+- **Voice Library**: 3,000+ community-shared voices across multiple languages
+- **Professional Voice Cloning**: Highest-fidelity voice replicas for professional use
+- **Instant Voice Cloning**: Quick voice replication from short audio samples
+- **Voice Design**: Generate custom voices from text descriptions
+
+Voice settings like stability and similarity allow for fine-tuning voice characteristics.
+
+### Voice Changer
+
+The Voice Changer technology transforms audio from one voice to another while preserving the original intonation, emotion, and pacing. This enables:
+
+- Voice transformation while maintaining the original delivery
+- Language translation with preserved emotional nuances
+- Voice style transfer across different speakers
+
+### Dubbing
+
+The Dubbing capability translates and synchronizes audio/video content into different languages while preserving the original speaker's style and emotion. Features include:
+
+- Automated translation and voice synthesis
+- Preservation of original voice characteristics
+- Support for multiple target languages
+- Both audio and video dubbing options
+
+### Sound Effects
+
+The Sound Effects API generates realistic sound effects from text descriptions, allowing creators to:
+
+- Create cinematic audio effects from simple text prompts
+- Generate background sounds for various media productions
+- Produce atmospheric and environmental audio
+
+### Voice Isolator
+
+The Voice Isolator tool removes background noise from audio recordings, enabling:
+
+- Clean voice extraction from noisy environments
+- Improved audio quality for voice processing
+- Better input quality for voice cloning and other applications
+
+### Conversational AI
+
+ElevenLabs' Conversational AI platform combines natural language understanding with voice technology to create interactive voice agents that can:
+
+- Engage in natural, human-like conversations
+- Process and respond to user queries in real time
+- Integrate with existing knowledge bases and systems
+- Deploy across various applications and channels
+
+## Technical Integration
+
+### API Access
+
+All ElevenLabs capabilities are accessible through a secure REST API:
+
+- Authentication via API keys created in the dashboard
+- JSON-based request and response formats
+- Rate limits based on subscription tier
+- Comprehensive error reporting
+
+### SDKs
+
+Official SDKs are available for:
+
+- Python
+- JavaScript/TypeScript
+
+These SDKs provide convenient wrapper functions around the API endpoints, simplifying integration.
+
+### Streaming
+
+Real-time audio streaming is supported through:
+
+- HTTP streaming with chunked transfer encoding
+- WebSocket connections for bidirectional communication
+- Stream parameter options for controlling buffer sizes and delivery
+
+## Models
+
+ElevenLabs offers several models optimized for different use cases:
+
+- **Multilingual v2**: Highest quality audio with nuanced expression
+- **Flash v2.5**: Ultra-low latency (75ms) optimized for real-time applications
+- **Speech to Speech**: Voice transformation between speakers
+- **Text to Sound Effects**: Sound effect generation from text descriptions
+
+Each model supports different languages, latency requirements, and output quality levels.
+
+## Development Workflow
+
+### Quickstart
+
+The quickstart guide walks developers through:
+
+1. Creating an API key in the dashboard
+2. Installing the SDK for their preferred language
+3. Making their first API request
+4. Processing and playing the resulting audio
+
+### Best Practices
+
+Documentation includes best practices for:
+
+- Prompting for optimal emotional expression
+- Latency optimization for real-time applications
+- Processing large text inputs efficiently
+- Managing audio quality vs. performance tradeoffs
+
+## Resources
+
+### Product Guides
+
+Step-by-step guides cover how to:
+
+- Use the ElevenLabs platform interface
+- Create and manage voices
+- Generate and customize speech
+- Deploy conversational AI agents
+
+### API Reference
+
+Comprehensive API documentation includes:
+
+- Authentication methods
+- Endpoint details with request/response formats
+- Parameter descriptions and constraints
+- Example code for common operations
+
+### Cookbooks and Examples
+
+Practical examples show how to:
+
+- Integrate ElevenLabs with various applications
+- Build specific audio workflows
+- Solve common implementation challenges
+
+## Pricing and Limits
+
+Services are available across multiple subscription tiers:
+
+- Free tier with basic capabilities
+- Paid tiers with increased limits and advanced features
+- Enterprise options for high-volume usage
+
+## FAQ
+
+Common questions addressed in the documentation include:
+
+- Voice ownership and commercial usage rights
+- Latency optimization techniques
+- Voice consistency and quality control
+- Best practices for large text conversion
+- Voice cloning capabilities and processes
+
+## Conclusion
+
+ElevenLabs provides a comprehensive suite of AI audio technologies accessible through well-documented APIs and SDKs. Whether you're building applications for content creation, language learning, accessibility, or conversational interfaces, the platform offers the tools needed to create natural, engaging audio experiences.
+
+For specific implementation details, refer to the relevant sections of the documentation or contact ElevenLabs support.
