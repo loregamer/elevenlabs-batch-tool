@@ -43,3 +43,8 @@ A GUI tool for batch processing audio files using ElevenLabs' voice conversion t
 - Processing large files consumes more API credits
 - Conversion time depends on file size and internet connection
 - You can save your API key to avoid entering it every time
+
+## If Python randomly breaks
+
+`pip uninstall PyQt6 PyQt6-Qt6 PyQt6-sip pyqt6-tools`
+`pip install PyQt6==6.6.1 PyQt6-Qt6==6.6.1 PyQt6-sip`
