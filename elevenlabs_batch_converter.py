@@ -2,15 +2,14 @@ import sys
 import os
 import logging
 from pathlib import Path
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QComboBox, QFileDialog, QListWidget,
     QProgressBar, QMessageBox, QGroupBox, QListWidgetItem, QStyle,
     QSplitter, QFrame, QLineEdit, QFormLayout, QCheckBox, QSlider
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize
-from PyQt6.QtGui import QIcon, QFont
-from dotenv import load_dotenv, set_key
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize
+from PyQt5.QtGui import QIcon, QFont
 
 from elevenlabs_api import ElevenLabsAPI
 
@@ -99,9 +98,7 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.api = None
         self.worker = None
         self.voices = []
-        # Load environment variables to get API key if it exists
-        load_dotenv()
-        self.api_key = os.getenv("ELEVENLABS_API_KEY", "")
+        self.api_key = ""
         self.init_ui()
         
     def init_ui(self):
@@ -120,7 +117,7 @@ class ElevenLabsBatchConverter(QMainWindow):
         title_font.setPointSize(16)
         title_font.setBold(True)
         title_label.setFont(title_font)
-        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title_label.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(title_label)
         
         # API Key settings
@@ -128,7 +125,7 @@ class ElevenLabsBatchConverter(QMainWindow):
         api_key_layout = QFormLayout(api_key_group)
         
         self.api_key_input = QLineEdit(self.api_key)
-        self.api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.api_key_input.setEchoMode(QLineEdit.Password)
         self.api_key_input.setPlaceholderText("Enter your ElevenLabs API key here")
         api_key_layout.addRow("API Key:", self.api_key_input)
         
@@ -143,10 +140,6 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.connect_api_btn.clicked.connect(self.connect_api)
         api_key_buttons.addWidget(self.connect_api_btn)
         
-        self.save_key_btn = QPushButton("Save Key")
-        self.save_key_btn.clicked.connect(self.save_api_key)
-        api_key_buttons.addWidget(self.save_key_btn)
-        
         api_key_layout.addRow("", api_key_buttons)
         
         # Add credits display
@@ -159,7 +152,7 @@ class ElevenLabsBatchConverter(QMainWindow):
         main_layout.addWidget(api_key_group)
         
         # Split the UI into left and right panels
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter = QSplitter(Qt.Horizontal)
         main_layout.addWidget(splitter)
         
         # Left panel - File selection
@@ -213,30 +206,30 @@ class ElevenLabsBatchConverter(QMainWindow):
         
         # Stability slider (0.0 to 1.0)
         self.stability_label = QLabel("Stability: 0.5")
-        self.stability_slider = QSlider(Qt.Orientation.Horizontal)
+        self.stability_slider = QSlider(Qt.Horizontal)
         self.stability_slider.setRange(0, 100)
         self.stability_slider.setValue(50)  # Default 0.5
-        self.stability_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self.stability_slider.setTickPosition(QSlider.TicksBelow)
         self.stability_slider.setTickInterval(10)
         self.stability_slider.valueChanged.connect(self.update_stability_label)
         settings_layout.addRow(self.stability_label, self.stability_slider)
         
         # Similarity Boost slider (0.0 to 1.0)
         self.similarity_label = QLabel("Similarity Boost: 0.75")
-        self.similarity_slider = QSlider(Qt.Orientation.Horizontal)
+        self.similarity_slider = QSlider(Qt.Horizontal)
         self.similarity_slider.setRange(0, 100)
         self.similarity_slider.setValue(75)  # Default 0.75
-        self.similarity_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self.similarity_slider.setTickPosition(QSlider.TicksBelow)
         self.similarity_slider.setTickInterval(10)
         self.similarity_slider.valueChanged.connect(self.update_similarity_label)
         settings_layout.addRow(self.similarity_label, self.similarity_slider)
         
         # Style Exaggeration slider (0.0 to 1.0)
         self.style_label = QLabel("Style Exaggeration: 0.0")
-        self.style_slider = QSlider(Qt.Orientation.Horizontal)
+        self.style_slider = QSlider(Qt.Horizontal)
         self.style_slider.setRange(0, 100)
         self.style_slider.setValue(0)  # Default 0.0
-        self.style_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self.style_slider.setTickPosition(QSlider.TicksBelow)
         self.style_slider.setTickInterval(10)
         self.style_slider.valueChanged.connect(self.update_style_label)
         settings_layout.addRow(self.style_label, self.style_slider)
@@ -304,39 +297,13 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.open_output_btn = QPushButton("Open Output Folder")
         self.open_output_btn.clicked.connect(self.open_output_folder)
         main_layout.addWidget(self.open_output_btn)
-        
-        # If we already have an API key from .env, connect automatically
-        if self.api_key:
-            self.connect_api()
     
     def toggle_api_key_visibility(self):
         """Toggle between showing and hiding the API key."""
-        if self.api_key_input.echoMode() == QLineEdit.EchoMode.Password:
-            self.api_key_input.setEchoMode(QLineEdit.EchoMode.Normal)
+        if self.api_key_input.echoMode() == QLineEdit.Password:
+            self.api_key_input.setEchoMode(QLineEdit.Normal)
         else:
-            self.api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
-    
-    def save_api_key(self):
-        """Save the current API key to the .env file."""
-        api_key = self.api_key_input.text().strip()
-        if not api_key:
-            QMessageBox.warning(self, "Empty API Key", "Please enter an API key to save.")
-            return
-        
-        try:
-            # Check if .env file exists, if not create it
-            env_path = Path('.env')
-            if not env_path.exists():
-                env_path.touch()
-            
-            # Save the API key to the .env file
-            with open(env_path, 'w') as f:
-                f.write(f"ELEVENLABS_API_KEY={api_key}")
-            
-            QMessageBox.information(self, "Success", "API key saved to .env file successfully!")
-            
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to save API key: {str(e)}")
+            self.api_key_input.setEchoMode(QLineEdit.Password)
     
     def connect_api(self):
         """Initialize the ElevenLabs API with the current key and load voices."""
@@ -448,12 +415,12 @@ class ElevenLabsBatchConverter(QMainWindow):
         
         for file_path in files:
             # Check if the file is already in the list
-            existing_items = [self.file_list.item(i).data(Qt.ItemDataRole.UserRole) 
+            existing_items = [self.file_list.item(i).data(Qt.UserRole) 
                              for i in range(self.file_list.count())]
             
             if file_path not in existing_items:
                 item = QListWidgetItem(os.path.basename(file_path))
-                item.setData(Qt.ItemDataRole.UserRole, file_path)
+                item.setData(Qt.UserRole, file_path)
                 self.file_list.addItem(item)
     
     def remove_selected_file(self):
@@ -507,7 +474,7 @@ class ElevenLabsBatchConverter(QMainWindow):
         style = self.style_slider.value() / 100.0
         
         # Get all file paths from the list
-        file_paths = [self.file_list.item(i).data(Qt.ItemDataRole.UserRole) 
+        file_paths = [self.file_list.item(i).data(Qt.UserRole) 
                       for i in range(self.file_list.count())]
         
         # Clear previous results
@@ -567,12 +534,12 @@ class ElevenLabsBatchConverter(QMainWindow):
         
         if success:
             item.setText(f"✓ {file_name}")
-            item.setForeground(Qt.GlobalColor.darkGreen)
+            item.setForeground(Qt.darkGreen)
         else:
             item.setText(f"✗ {file_name}")
-            item.setForeground(Qt.GlobalColor.red)
+            item.setForeground(Qt.red)
         
-        item.setData(Qt.ItemDataRole.UserRole, file_path)
+        item.setData(Qt.UserRole, file_path)
         self.results_list.addItem(item)
     
     def conversion_finished(self):
