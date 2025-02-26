@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QComboBox, QFileDialog, QListWidget,
     QProgressBar, QMessageBox, QGroupBox, QListWidgetItem, QStyle,
-    QSplitter, QFrame, QLineEdit, QFormLayout, QCheckBox
+    QSplitter, QFrame, QLineEdit, QFormLayout, QCheckBox, QSlider
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize
 from PyQt6.QtGui import QIcon, QFont
@@ -25,7 +25,8 @@ class ConversionWorker(QThread):
     conversion_complete = pyqtSignal(str, bool)  # (file_path, success)
     conversion_finished = pyqtSignal()  # All conversions complete
     
-    def __init__(self, api, voice_id, file_list, model_id, speaker_boost, remove_background_noise):
+    def __init__(self, api, voice_id, file_list, model_id, speaker_boost, remove_background_noise, 
+                 stability, similarity_boost, style):
         super().__init__()
         self.api = api
         self.voice_id = voice_id
@@ -33,6 +34,9 @@ class ConversionWorker(QThread):
         self.model_id = model_id
         self.speaker_boost = speaker_boost
         self.remove_background_noise = remove_background_noise
+        self.stability = stability
+        self.similarity_boost = similarity_boost
+        self.style = style
         self.is_cancelled = False
     
     def run(self):
@@ -61,7 +65,10 @@ class ConversionWorker(QThread):
                     audio_file_path=file_path,
                     model_id=self.model_id,
                     speaker_boost=self.speaker_boost,
-                    remove_background_noise=self.remove_background_noise
+                    remove_background_noise=self.remove_background_noise,
+                    stability=self.stability,
+                    similarity_boost=self.similarity_boost,
+                    style=self.style
                 )
                 
                 if audio_data:
@@ -199,6 +206,42 @@ class ElevenLabsBatchConverter(QMainWindow):
         voice_layout.addWidget(QLabel("Select Model:"))
         self.model_combo = QComboBox()
         voice_layout.addWidget(self.model_combo)
+        
+        # Add voice model settings group
+        settings_group = QGroupBox("Voice Model Settings")
+        settings_layout = QFormLayout(settings_group)
+        
+        # Stability slider (0.0 to 1.0)
+        self.stability_label = QLabel("Stability: 0.5")
+        self.stability_slider = QSlider(Qt.Orientation.Horizontal)
+        self.stability_slider.setRange(0, 100)
+        self.stability_slider.setValue(50)  # Default 0.5
+        self.stability_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self.stability_slider.setTickInterval(10)
+        self.stability_slider.valueChanged.connect(self.update_stability_label)
+        settings_layout.addRow(self.stability_label, self.stability_slider)
+        
+        # Similarity Boost slider (0.0 to 1.0)
+        self.similarity_label = QLabel("Similarity Boost: 0.75")
+        self.similarity_slider = QSlider(Qt.Orientation.Horizontal)
+        self.similarity_slider.setRange(0, 100)
+        self.similarity_slider.setValue(75)  # Default 0.75
+        self.similarity_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self.similarity_slider.setTickInterval(10)
+        self.similarity_slider.valueChanged.connect(self.update_similarity_label)
+        settings_layout.addRow(self.similarity_label, self.similarity_slider)
+        
+        # Style Exaggeration slider (0.0 to 1.0)
+        self.style_label = QLabel("Style Exaggeration: 0.0")
+        self.style_slider = QSlider(Qt.Orientation.Horizontal)
+        self.style_slider.setRange(0, 100)
+        self.style_slider.setValue(0)  # Default 0.0
+        self.style_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self.style_slider.setTickInterval(10)
+        self.style_slider.valueChanged.connect(self.update_style_label)
+        settings_layout.addRow(self.style_label, self.style_slider)
+        
+        voice_layout.addWidget(settings_group)
         
         # Add speaker boost option
         self.speaker_boost_checkbox = QCheckBox("Speaker Boost")
@@ -423,6 +466,21 @@ class ElevenLabsBatchConverter(QMainWindow):
         """Clear all files from the list."""
         self.file_list.clear()
     
+    def update_stability_label(self, value):
+        """Update the stability label when the slider changes."""
+        stability_value = value / 100.0
+        self.stability_label.setText(f"Stability: {stability_value:.2f}")
+    
+    def update_similarity_label(self, value):
+        """Update the similarity boost label when the slider changes."""
+        similarity_value = value / 100.0
+        self.similarity_label.setText(f"Similarity Boost: {similarity_value:.2f}")
+    
+    def update_style_label(self, value):
+        """Update the style exaggeration label when the slider changes."""
+        style_value = value / 100.0
+        self.style_label.setText(f"Style Exaggeration: {style_value:.2f}")
+    
     def start_conversion(self):
         """Start the batch conversion process."""
         if self.file_list.count() == 0:
@@ -443,6 +501,11 @@ class ElevenLabsBatchConverter(QMainWindow):
         speaker_boost = self.speaker_boost_checkbox.isChecked()
         remove_background_noise = self.remove_noise_checkbox.isChecked()
         
+        # Get the voice model settings
+        stability = self.stability_slider.value() / 100.0
+        similarity_boost = self.similarity_slider.value() / 100.0
+        style = self.style_slider.value() / 100.0
+        
         # Get all file paths from the list
         file_paths = [self.file_list.item(i).data(Qt.ItemDataRole.UserRole) 
                       for i in range(self.file_list.count())]
@@ -461,6 +524,9 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.model_combo.setEnabled(False)
         self.speaker_boost_checkbox.setEnabled(False)
         self.remove_noise_checkbox.setEnabled(False)
+        self.stability_slider.setEnabled(False)
+        self.similarity_slider.setEnabled(False)
+        self.style_slider.setEnabled(False)
         self.refresh_voices_btn.setEnabled(False)
         self.cancel_btn.setEnabled(True)
         
@@ -471,7 +537,10 @@ class ElevenLabsBatchConverter(QMainWindow):
             file_paths,
             model_id,
             speaker_boost,
-            remove_background_noise
+            remove_background_noise,
+            stability,
+            similarity_boost,
+            style
         )
         self.worker.progress_updated.connect(self.update_progress)
         self.worker.conversion_complete.connect(self.add_conversion_result)
@@ -507,7 +576,7 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.results_list.addItem(item)
     
     def conversion_finished(self):
-        """Handle completion of all conversions."""
+        """Handle the completion of all conversions."""
         # Set progress bar to 100%
         self.progress_bar.setValue(100)
         
@@ -520,8 +589,10 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.model_combo.setEnabled(True)
         self.speaker_boost_checkbox.setEnabled(True)
         self.remove_noise_checkbox.setEnabled(True)
+        self.stability_slider.setEnabled(True)
+        self.similarity_slider.setEnabled(True)
+        self.style_slider.setEnabled(True)
         self.refresh_voices_btn.setEnabled(True)
-        
         self.cancel_btn.setEnabled(False)
         
         # Update credits display after conversion
@@ -533,7 +604,7 @@ class ElevenLabsBatchConverter(QMainWindow):
         
         for i in range(self.results_list.count()):
             item = self.results_list.item(i)
-            if item.data(Qt.ItemDataRole.UserRole):  # True for success
+            if "✓" in item.text():
                 success_count += 1
             else:
                 failed_count += 1

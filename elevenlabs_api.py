@@ -2,6 +2,7 @@ import os
 import requests
 from dotenv import load_dotenv
 import logging
+import json
 
 # Load environment variables
 load_dotenv()
@@ -79,7 +80,8 @@ class ElevenLabsAPI:
             return None
     
     def convert_speech_to_speech(self, voice_id, audio_file_path, model_id="eleven_multilingual_sts_v2", 
-                                speaker_boost=True, remove_background_noise=False, output_format="mp3_44100_128"):
+                                speaker_boost=True, remove_background_noise=False, output_format="mp3_44100_128",
+                                stability=0.5, similarity_boost=0.75, style=0.0):
         """
         Convert speech in an audio file to speech with a different voice.
         
@@ -92,6 +94,9 @@ class ElevenLabsAPI:
             speaker_boost (bool): Whether to enhance the target speaker's voice (default: True)
             remove_background_noise (bool): Whether to remove background noise (default: False)
             output_format (str): Desired output format
+            stability (float): Value between 0 and 1 that affects the consistency of voice generation (default: 0.5)
+            similarity_boost (float): Value between 0 and 1 that affects how closely the output matches the voice samples (default: 0.75)
+            style (float): Value between 0 and 1 that affects the style exaggeration of the voice (default: 0.0)
             
         Returns:
             bytes: The converted audio data if successful, None otherwise
@@ -112,11 +117,26 @@ class ElevenLabsAPI:
                 "remove_silence": remove_background_noise  # API parameter name is different from our method parameter
             }
             
+            # Add voice settings if provided
+            voice_settings = {}
+            if stability is not None:
+                voice_settings["stability"] = stability
+            if similarity_boost is not None:
+                voice_settings["similarity_boost"] = similarity_boost
+            if style is not None:
+                voice_settings["style"] = style
+                
+            # Only add voice_settings to data if it's not empty
+            # Convert voice_settings to a JSON string as required by the API
+            if voice_settings:
+                data["voice_settings"] = json.dumps(voice_settings)
+            
             # Need to remove the accept header for binary response
             headers = self.headers.copy()
             headers["accept"] = "audio/mpeg"
             
             self.logger.info(f"Converting file: {audio_file_path} with model: {model_id}, speaker_boost: {speaker_boost}, remove_silence: {remove_background_noise}")
+            self.logger.info(f"Voice settings: stability={stability}, similarity_boost={similarity_boost}, style={style}")
             response = requests.post(url, headers=headers, data=data, files=files)
             
             # Close the file
