@@ -1,0 +1,758 @@
+---
+description: Comprehensive documentation of all ElevenLabs API endpoints and their functionality
+globs: 
+alwaysApply: false
+---
+---
+title: ElevenLabs API Reference Guide
+subtitle: Comprehensive documentation of all ElevenLabs API endpoints and their functionality
+---
+
+# ElevenLabs API Reference Guide
+
+This guide provides detailed documentation for all available ElevenLabs API endpoints, their parameters, and how to use them effectively.
+
+## Base URL
+
+All API requests should be made to the following base URL:
+
+```
+https://api.elevenlabs.io
+```
+
+## Authentication
+
+ElevenLabs API uses API keys for authentication. Every request to the API must include your API key to authenticate requests and track usage quota.
+
+### API Key Configuration
+
+API keys can be configured with:
+- **Scope restrictions**: Limit which API endpoints the key can access
+- **Credit quota**: Define custom credit limits to control usage
+
+### Including Your API Key
+
+Include your API key in the `xi-api-key` HTTP header:
+
+```bash
+xi-api-key: YOUR_ELEVENLABS_API_KEY
+```
+
+**Important**: Your API key should be kept secret. Never share it or include it in client-side code.
+
+## Text to Speech API
+
+The Text to Speech API converts text into lifelike spoken audio.
+
+### Convert Text to Speech
+
+**Endpoint**: `POST /v1/text-to-speech/{voice_id}`
+
+Converts text to speech with the specified voice.
+
+**Path Parameters**:
+- `voice_id` (string, required): The ID of the voice to use for speech synthesis
+
+**Request Body Parameters**:
+- `text` (string, required): The text to convert to speech
+- `model_id` (string, required): The ID of the model to use (e.g., `eleven_multilingual_v2`, `eleven_turbo_v2`)
+- `voice_settings` (object, optional): Settings to control the voice generation
+  - `stability` (float, 0-1): Affects the consistency of voice generation, higher values produce more stable output
+  - `similarity_boost` (float, 0-1): Affects how closely the output matches the voice samples
+- `output_format` (string, optional): The audio format, sample rate, and bitrate (e.g., `mp3_44100_128`)
+- `optimize_streaming_latency` (integer, optional): Level of streaming latency optimization (0-4)
+- `seed` (integer, optional): For deterministic output, use the same seed and text to get the same audio
+- `previous_text` (string, optional): Text that comes before the current text for context
+- `next_text` (string, optional): Text that comes after the current text for context
+- `previous_request_id` (string, optional): The ID of the previous request for context
+
+**Response**:
+- Audio data in the specified format
+
+**Example Request**:
+```python
+from elevenlabs.client import ElevenLabs
+
+client = ElevenLabs()
+
+audio = client.text_to_speech.convert(
+    text="The first move is what sets everything in motion.",
+    voice_id="JBFqnCBsd6RMkjVDRZzb",
+    model_id="eleven_multilingual_v2",
+    output_format="mp3_44100_128",
+)
+
+# Save or play the audio
+with open("output.mp3", "wb") as f:
+    f.write(audio)
+```
+
+### Text to Speech with Timestamps
+
+**Endpoint**: `POST /v1/text-to-speech/{voice_id}/with-timestamps`
+
+Converts text to speech and returns timing information for each word.
+
+**Path Parameters**:
+- `voice_id` (string, required): The ID of the voice to use
+
+**Request Body Parameters**:
+- Same as the standard Text to Speech endpoint, plus:
+  - `word_timestamp_granularity` (string, optional): Level of timestamp detail ("word", "sentence", etc.)
+
+**Response**:
+- Audio data with timestamp metadata for each word
+
+### Text to Speech Streaming
+
+**Endpoint**: `POST /v1/text-to-speech/{voice_id}/stream`
+
+Streams audio in real-time as it's being generated.
+
+**Path Parameters**:
+- `voice_id` (string, required): The ID of the voice to use
+
+**Request Body Parameters**:
+- Same as the standard Text to Speech endpoint
+
+**Response**:
+- Chunked transfer encoded audio stream
+
+**Example Request**:
+```python
+from elevenlabs import stream
+from elevenlabs.client import ElevenLabs
+
+client = ElevenLabs()
+
+audio_stream = client.text_to_speech.convert_as_stream(
+    text="This is streaming audio in real-time.",
+    voice_id="JBFqnCBsd6RMkjVDRZzb",
+    model_id="eleven_multilingual_v2"
+)
+
+# Play the streamed audio
+stream(audio_stream)
+```
+
+### Text to Speech Streaming with Timestamps
+
+**Endpoint**: `POST /v1/text-to-speech/{voice_id}/stream-with-timestamps`
+
+Streams audio with timestamp information for real-time applications.
+
+**Path Parameters**:
+- `voice_id` (string, required): The ID of the voice to use
+
+**Request Body Parameters**:
+- Same as Text to Speech with Timestamps endpoint
+
+**Response**:
+- Chunked transfer encoded audio stream with timestamp metadata
+
+## Voice API
+
+The Voice API allows you to manage, create, and customize voices.
+
+### Get All Voices
+
+**Endpoint**: `GET /v1/voices`
+
+Retrieves all voices available to you.
+
+**Query Parameters**:
+- None
+
+**Response**:
+- List of all voices in your account and publicly available voices
+
+**Example Request**:
+```python
+from elevenlabs.client import ElevenLabs
+
+client = ElevenLabs()
+voices = client.voices.get_all()
+
+for voice in voices.voices:
+    print(f"Voice ID: {voice.voice_id}, Name: {voice.name}")
+```
+
+### Get Voice
+
+**Endpoint**: `GET /v1/voices/{voice_id}`
+
+Retrieves information about a specific voice.
+
+**Path Parameters**:
+- `voice_id` (string, required): The ID of the voice to retrieve
+
+**Response**:
+- Details about the specified voice
+
+### Add Voice
+
+**Endpoint**: `POST /v1/voices/add`
+
+Adds a new voice to your account by uploading voice samples.
+
+**Request Body Parameters**:
+- `name` (string, required): The name for the new voice
+- `files` (array, required): Voice sample audio files for cloning (MP3 or WAV)
+- `description` (string, optional): Description of the voice
+- `labels` (object, optional): Custom labels to organize voices
+
+**Response**:
+- Details of the newly created voice
+
+**Example Request**:
+```python
+from elevenlabs.client import ElevenLabs
+
+client = ElevenLabs()
+
+with open("sample1.mp3", "rb") as f1, open("sample2.mp3", "rb") as f2:
+    voice = client.voices.add(
+        name="My Custom Voice",
+        description="A voice created from my samples",
+        files=[f1, f2]
+    )
+
+print(f"Created voice with ID: {voice.voice_id}")
+```
+
+### Delete Voice
+
+**Endpoint**: `DELETE /v1/voices/{voice_id}`
+
+Deletes a voice from your account.
+
+**Path Parameters**:
+- `voice_id` (string, required): The ID of the voice to delete
+
+**Response**:
+- Confirmation of voice deletion
+
+### Edit Voice Settings
+
+**Endpoint**: `POST /v1/voices/{voice_id}/settings/edit`
+
+Modifies the settings for a specific voice.
+
+**Path Parameters**:
+- `voice_id` (string, required): The ID of the voice to modify
+
+**Request Body Parameters**:
+- `stability` (float, 0-1): Affects the consistency of voice generation
+- `similarity_boost` (float, 0-1): Affects how closely the output matches the voice samples
+- `style` (float, 0-1, optional): Applies to certain voices with style capability
+- `use_speaker_boost` (boolean, optional): Whether to enhance speaker clarity
+
+**Response**:
+- Updated voice settings
+
+## Speech to Speech API
+
+The Speech to Speech API transforms speech from one voice to another.
+
+### Convert Speech to Speech
+
+**Endpoint**: `POST /v1/speech-to-speech/{voice_id}`
+
+Transforms input audio using the specified target voice.
+
+**Path Parameters**:
+- `voice_id` (string, required): The ID of the target voice
+
+**Request Body Parameters**:
+- `audio` (file, required): The input audio file to transform
+- `model_id` (string, required): The model to use (e.g., `eleven_multilingual_sts_v2`)
+- `voice_settings` (object, optional): Settings to control the voice generation
+- `output_format` (string, optional): The audio format, sample rate, and bitrate
+
+**Response**:
+- Transformed audio data
+
+**Example Request**:
+```python
+from elevenlabs.client import ElevenLabs
+import requests
+from io import BytesIO
+
+client = ElevenLabs()
+voice_id = "JBFqnCBsd6RMkjVDRZzb"
+
+# Get audio from a URL
+response = requests.get("https://example.com/sample.mp3")
+audio_data = BytesIO(response.content)
+
+# Transform the speech
+audio_stream = client.speech_to_speech.convert(
+    voice_id=voice_id,
+    audio=audio_data,
+    model_id="eleven_multilingual_sts_v2",
+    output_format="mp3_44100_128",
+)
+
+# Save the transformed audio
+with open("transformed.mp3", "wb") as f:
+    f.write(audio_stream)
+```
+
+### Speech to Speech Streaming
+
+**Endpoint**: `POST /v1/speech-to-speech/{voice_id}/stream`
+
+Streams transformed audio in real-time.
+
+**Path Parameters**:
+- `voice_id` (string, required): The ID of the target voice
+
+**Request Body Parameters**:
+- Same as the standard Speech to Speech endpoint
+
+**Response**:
+- Chunked transfer encoded audio stream
+
+## Voice Generation API
+
+The Voice Generation API creates custom voices from text descriptions or voice samples.
+
+### Generate Voice Parameters
+
+**Endpoint**: `GET /v1/voice-generation/generate-voice-parameters`
+
+Gets parameters for voice generation.
+
+**Response**:
+- Available parameters for voice generation
+
+### Generate a Random Voice
+
+**Endpoint**: `POST /v1/voice-generation/generate-voice`
+
+Generates a random voice.
+
+**Request Body Parameters**:
+- `name` (string, required): Name for the new voice
+- `gender` (string, optional): Gender of the voice (male, female, etc.)
+- `accent` (string, optional): Accent for the voice
+- `age` (string, optional): Age group for the voice
+- `accent_strength` (float, optional): Strength of the accent
+
+**Response**:
+- Details of the generated voice
+
+### Generate Voice Previews from Description
+
+**Endpoint**: `POST /v1/text-to-voice/create-previews`
+
+Creates voice previews based on a text description.
+
+**Request Body Parameters**:
+- `voice_description` (string, required): Description of the voice
+- `text` (string, required): Text to synthesize with the generated voices
+- `gender` (string, optional): Gender of the voice
+- `age` (string, optional): Age group of the voice
+- `accent` (string, optional): Accent for the voice
+- `preview_count` (integer, optional): Number of previews to generate
+
+**Response**:
+- List of voice previews with audio samples
+
+**Example Request**:
+```python
+from elevenlabs.client import ElevenLabs
+import base64
+
+client = ElevenLabs()
+
+voices = client.text_to_voice.create_previews(
+    voice_description="A sassy squeaky mouse",
+    text="Every act of kindness makes a difference.",
+)
+
+# Play or save the first voice preview
+voice_preview = voices.previews[0].audio_base_64
+audio_bytes = base64.b64decode(voice_preview)
+
+with open("voice_preview.mp3", "wb") as f:
+    f.write(audio_bytes)
+```
+
+### Create Voice from Preview
+
+**Endpoint**: `POST /v1/text-to-voice/create-voice-from-preview`
+
+Creates a permanent voice from a previously generated preview.
+
+**Request Body Parameters**:
+- `voice_preview_id` (string, required): ID of the preview
+- `name` (string, required): Name for the new voice
+- `description` (string, optional): Description of the voice
+
+**Response**:
+- Details of the newly created voice
+
+## Sound Effects API
+
+The Sound Effects API generates realistic sound effects from text descriptions.
+
+### Generate Sound Effects
+
+**Endpoint**: `POST /v1/sound-generation`
+
+Creates sound effects based on text descriptions.
+
+**Request Body Parameters**:
+- `text` (string, required): Description of the sound effect
+
+**Response**:
+- Audio data containing the generated sound effect
+
+**Example Request**:
+```python
+from elevenlabs.client import ElevenLabs
+from elevenlabs import play
+
+client = ElevenLabs()
+audio = client.text_to_sound_effects.convert(
+    text="Cinematic Braam, Horror"
+)
+
+# Play the sound effect
+play(audio)
+
+# Save the sound effect
+with open("sound_effect.mp3", "wb") as f:
+    f.write(audio)
+```
+
+## Audio Isolation API
+
+The Audio Isolation API removes background noise from audio recordings.
+
+### Audio Isolation
+
+**Endpoint**: `POST /v1/audio-isolation`
+
+Isolates voice from background noise in audio recordings.
+
+**Request Body Parameters**:
+- `audio` (file, required): The input audio file to process
+
+**Response**:
+- Processed audio with isolated voice
+
+**Example Request**:
+```python
+from elevenlabs.client import ElevenLabs
+import requests
+from io import BytesIO
+
+client = ElevenLabs()
+
+# Get audio from a URL
+audio_url = "https://example.com/noisy_audio.mp3"
+response = requests.get(audio_url)
+audio_data = BytesIO(response.content)
+
+# Isolate the voice
+audio_stream = client.audio_isolation.audio_isolation(audio=audio_data)
+
+# Save the processed audio
+with open("isolated_voice.mp3", "wb") as f:
+    f.write(audio_stream)
+```
+
+### Audio Isolation Stream
+
+**Endpoint**: `POST /v1/audio-isolation/stream`
+
+Streams processed audio with isolated voice in real-time.
+
+**Request Body Parameters**:
+- `audio` (file, required): The input audio file to process
+
+**Response**:
+- Chunked transfer encoded audio stream with isolated voice
+
+## Dubbing API
+
+The Dubbing API translates and synchronizes audio/video content into different languages.
+
+### Dub a Video or Audio File
+
+**Endpoint**: `POST /v1/dubbing`
+
+Dubs audio or video from one language to another.
+
+**Request Body Parameters**:
+- `file` (file, required): The input audio or video file
+- `target_lang` (string, required): The target language code (e.g., "es" for Spanish)
+- `source_lang` (string, optional): The source language code
+- `generate_timestamps` (boolean, optional): Whether to generate timestamps
+- `chunk_size_seconds` (integer, optional): Duration of each processing chunk in seconds
+
+**Response**:
+- Dubbing project details including project ID
+
+**Example Request**:
+```python
+from elevenlabs.client import ElevenLabs
+import time
+
+client = ElevenLabs()
+
+with open("video.mp4", "rb") as file:
+    # Start dubbing process
+    dubbed = client.dubbing.dub_a_video_or_an_audio_file(
+        file=file,
+        target_lang="es"  # Spanish
+    )
+
+    # Poll for completion
+    while True:
+        status = client.dubbing.get_dubbing_project_metadata(
+            dubbed.dubbing_id
+        ).status
+        
+        if status == "dubbed":
+            # Download the dubbed file
+            dubbed_file = client.dubbing.get_dubbed_file(
+                dubbed.dubbing_id,
+                "es"
+            )
+            
+            # Save the dubbed file
+            with open("dubbed_video.mp4", "wb") as f:
+                f.write(dubbed_file)
+            break
+        else:
+            print("Still dubbing...")
+            time.sleep(5)
+```
+
+### Get Dubbing Project Metadata
+
+**Endpoint**: `GET /v1/dubbing/{dubbing_id}`
+
+Retrieves metadata for a dubbing project.
+
+**Path Parameters**:
+- `dubbing_id` (string, required): The ID of the dubbing project
+
+**Response**:
+- Details about the dubbing project including status
+
+### Get Dubbed File
+
+**Endpoint**: `GET /v1/dubbing/{dubbing_id}/audio/{language_code}`
+
+Retrieves the dubbed audio or video file.
+
+**Path Parameters**:
+- `dubbing_id` (string, required): The ID of the dubbing project
+- `language_code` (string, required): The language code of the dubbed content
+
+**Response**:
+- Dubbed audio or video file
+
+### Get Transcript for Dub
+
+**Endpoint**: `GET /v1/dubbing/{dubbing_id}/transcript/{language_code}`
+
+Retrieves the transcript for a dubbed project.
+
+**Path Parameters**:
+- `dubbing_id` (string, required): The ID of the dubbing project
+- `language_code` (string, required): The language code of the transcript
+
+**Response**:
+- Transcript text for the dubbed content
+
+### Delete Dubbing Project
+
+**Endpoint**: `DELETE /v1/dubbing/{dubbing_id}`
+
+Deletes a dubbing project.
+
+**Path Parameters**:
+- `dubbing_id` (string, required): The ID of the dubbing project
+
+**Response**:
+- Confirmation of deletion
+
+## History API
+
+The History API allows you to access and manage your previously generated audio.
+
+### Get Generated Items
+
+**Endpoint**: `GET /v1/history`
+
+Retrieves metadata for all your generated audio.
+
+**Query Parameters**:
+- `page_size` (integer, optional): Maximum number of items to return
+- `start_after_history_item_id` (string, optional): ID to start pagination after
+- `voice_id` (string, optional): Filter by voice ID
+- `search` (string, optional): Search term for filtering
+- `source` (string, optional): Source of the generated item (TTS, STS)
+
+**Response**:
+- List of generated audio items with metadata
+
+### Get History Item by ID
+
+**Endpoint**: `GET /v1/history/{history_item_id}`
+
+Retrieves metadata for a specific history item.
+
+**Path Parameters**:
+- `history_item_id` (string, required): The ID of the history item
+
+**Response**:
+- Details about the specified history item
+
+### Get Audio from History Item
+
+**Endpoint**: `GET /v1/history/{history_item_id}/audio`
+
+Retrieves the audio for a specific history item.
+
+**Path Parameters**:
+- `history_item_id` (string, required): The ID of the history item
+
+**Response**:
+- Audio data for the specified history item
+
+### Delete History Item
+
+**Endpoint**: `DELETE /v1/history/{history_item_id}`
+
+Deletes a specific history item.
+
+**Path Parameters**:
+- `history_item_id` (string, required): The ID of the history item to delete
+
+**Response**:
+- Confirmation of deletion
+
+## User API
+
+The User API provides information about your account and subscription.
+
+### Get User Info
+
+**Endpoint**: `GET /v1/user`
+
+Retrieves information about your account.
+
+**Response**:
+- User information including subscription details
+
+### Get User Subscription Info
+
+**Endpoint**: `GET /v1/user/subscription`
+
+Retrieves detailed information about your subscription.
+
+**Response**:
+- Subscription details including tier, character limits, and credits
+
+## Models API
+
+The Models API provides information about available models.
+
+### Get Models
+
+**Endpoint**: `GET /v1/models`
+
+Retrieves a list of available models.
+
+**Response**:
+- List of available models with capabilities and languages
+
+**Example Request**:
+```python
+from elevenlabs.client import ElevenLabs
+
+client = ElevenLabs()
+models = client.models.get_all()
+
+for model in models.models:
+    print(f"Model: {model.model_id}, Name: {model.name}")
+    print(f"Description: {model.description}")
+    print(f"Languages: {model.languages}")
+    print("---")
+```
+
+## Streaming Best Practices
+
+When using streaming endpoints:
+
+1. **Buffer Management**: Implement proper buffer management to handle varying network conditions
+2. **Chunked Encoding**: Use libraries that properly handle chunked transfer encoding
+3. **Concurrency**: For high-volume applications, implement connection pooling
+4. **Error Handling**: Implement error handling for unexpected stream interruptions
+
+```python
+# Example of proper stream handling in Python
+from elevenlabs import stream
+from elevenlabs.client import ElevenLabs
+
+client = ElevenLabs()
+
+# Set a smaller chunk size for more frequent updates
+audio_stream = client.text_to_speech.convert_as_stream(
+    text="This is a streaming example with proper error handling.",
+    voice_id="JBFqnCBsd6RMkjVDRZzb",
+    model_id="eleven_multilingual_v2"
+)
+
+try:
+    stream(audio_stream)
+except Exception as e:
+    print(f"Stream error: {e}")
+    # Implement reconnection logic
+```
+
+## Rate Limits and Quotas
+
+- Rate limits vary by subscription tier
+- Higher tiers allow more concurrent API calls
+- Character limits reset monthly based on your subscription
+- Monitor your usage via the `/v1/user/subscription` endpoint
+
+## Error Handling
+
+The API uses standard HTTP status codes:
+
+- **200 OK**: Successful request
+- **400 Bad Request**: Invalid request parameters
+- **401 Unauthorized**: Missing or invalid API key
+- **403 Forbidden**: Insufficient permissions
+- **404 Not Found**: Resource not found
+- **429 Too Many Requests**: Rate limit exceeded
+- **500, 502, 503, 504**: Server errors
+
+Error responses include a JSON body with:
+- `detail`: Description of the error
+- `status_code`: HTTP status code
+- `error_type`: Type of error
+
+Example error response:
+
+```json
+{
+  "detail": "Not enough character quota. Character limit is 5000, current character count is 4500, requested characters 1000.",
+  "status_code": 429,
+  "error_type": "character_quota_exceeded"
+}
+```
+
+## Conclusion
+
+The ElevenLabs API provides a comprehensive set of endpoints for voice synthesis, voice transformation, sound effects generation, and more. By understanding these endpoints and how to use them correctly, you can integrate ElevenLabs' powerful AI audio capabilities into your applications.
+
+For additional support or questions, visit the [ElevenLabs documentation](https://elevenlabs.io/docs) or contact support directly.
