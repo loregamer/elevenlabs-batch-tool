@@ -8,8 +8,8 @@ from PyQt6.QtWidgets import (
     QProgressBar, QMessageBox, QGroupBox, QListWidgetItem, QStyle,
     QSplitter, QFrame, QLineEdit, QFormLayout, QCheckBox, QSlider
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize
-from PyQt6.QtGui import QIcon, QFont, QColor
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize, QUrl, QMimeData
+from PyQt6.QtGui import QIcon, QFont, QColor, QDragEnterEvent, QDropEvent
 import keyring
 import qtawesome as qta
 
@@ -23,6 +23,88 @@ logger = logging.getLogger("BatchConverter")
 # Constants for keyring
 APP_NAME = "ElevenLabsBatchConverter"
 KEY_NAME = "ElevenLabsAPIKey"
+
+class DragDropListWidget(QListWidget):
+    """Custom QListWidget that supports drag and drop of audio files."""
+    
+    def __init__(self, parent=None, accepted_extensions=None):
+        super().__init__(parent)
+        self.setAcceptDrops(True)
+        self.accepted_extensions = accepted_extensions or [".mp3", ".wav", ".ogg", ".flac", ".m4a"]
+        self.setStyleSheet("""
+            DragDropListWidget {
+                border: 1px solid #bdc3c7;
+                border-radius: 4px;
+            }
+        """)
+        self._default_stylesheet = self.styleSheet()
+        self._drag_active = False
+        
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        """Handle drag enter events for files."""
+        if event.mimeData().hasUrls():
+            # Check if at least one file has an accepted extension
+            for url in event.mimeData().urls():
+                if self._is_accepted_file(url):
+                    self._set_drag_active(True)
+                    event.acceptProposedAction()
+                    return
+    
+    def dragLeaveEvent(self, event):
+        """Handle drag leave events."""
+        self._set_drag_active(False)
+        
+    def dragMoveEvent(self, event):
+        """Handle drag move events."""
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+            
+    def dropEvent(self, event: QDropEvent):
+        """Handle drop events for files."""
+        self._set_drag_active(False)
+        
+        if event.mimeData().hasUrls():
+            event.setDropAction(Qt.DropAction.CopyAction)
+            event.accept()
+            
+            # Process the dropped files
+            for url in event.mimeData().urls():
+                if self._is_accepted_file(url):
+                    self._add_file(url.toLocalFile())
+    
+    def _set_drag_active(self, active):
+        """Set the drag active state and update the visual style."""
+        if self._drag_active != active:
+            self._drag_active = active
+            if active:
+                self.setStyleSheet(self._default_stylesheet + """
+                    DragDropListWidget {
+                        border: 2px dashed #3498db;
+                        background-color: rgba(52, 152, 219, 0.1);
+                    }
+                """)
+            else:
+                self.setStyleSheet(self._default_stylesheet)
+    
+    def _is_accepted_file(self, url: QUrl) -> bool:
+        """Check if the file has an accepted extension."""
+        if not url.isLocalFile():
+            return False
+            
+        file_path = url.toLocalFile()
+        file_ext = os.path.splitext(file_path)[1].lower()
+        return file_ext in self.accepted_extensions
+    
+    def _add_file(self, file_path: str):
+        """Add a file to the list if it's not already there."""
+        # Check if the file is already in the list
+        existing_items = [self.item(i).data(Qt.ItemDataRole.UserRole) 
+                         for i in range(self.count())]
+        
+        if file_path not in existing_items:
+            item = QListWidgetItem(os.path.basename(file_path))
+            item.setData(Qt.ItemDataRole.UserRole, file_path)
+            self.addItem(item)
 
 class ConversionWorker(QThread):
     """Worker thread to handle audio conversion without blocking the UI."""
@@ -107,6 +189,9 @@ class ElevenLabsBatchConverter(QMainWindow):
         
         # Try to get API key from keyring
         self.api_key = keyring.get_password(APP_NAME, KEY_NAME) or ""
+        
+        # Enable drag and drop for the main window
+        self.setAcceptDrops(True)
         
         self.init_ui()
         
@@ -208,8 +293,14 @@ class ElevenLabsBatchConverter(QMainWindow):
         file_layout = QVBoxLayout(file_group)
         
         # File list
-        self.file_list = QListWidget()
+        self.file_list = DragDropListWidget(self)
         file_layout.addWidget(self.file_list)
+        
+        # Add a label to indicate drag and drop functionality
+        drag_drop_label = QLabel("Drag and drop audio files here")
+        drag_drop_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        drag_drop_label.setStyleSheet("color: #7f8c8d; font-style: italic;")
+        file_layout.addWidget(drag_drop_label)
         
         # File buttons
         file_buttons = QHBoxLayout()
@@ -496,14 +587,7 @@ class ElevenLabsBatchConverter(QMainWindow):
         )
         
         for file_path in files:
-            # Check if the file is already in the list
-            existing_items = [self.file_list.item(i).data(Qt.ItemDataRole.UserRole) 
-                             for i in range(self.file_list.count())]
-            
-            if file_path not in existing_items:
-                item = QListWidgetItem(os.path.basename(file_path))
-                item.setData(Qt.ItemDataRole.UserRole, file_path)
-                self.file_list.addItem(item)
+            self.file_list._add_file(file_path)
     
     def remove_selected_file(self):
         """Remove the selected file from the list."""
@@ -688,6 +772,21 @@ class ElevenLabsBatchConverter(QMainWindow):
         
         # Use OS-specific command to open folder
         os.startfile(output_dir)
+
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        """Forward drag enter events to the file list widget."""
+        if self.file_list:
+            self.file_list.dragEnterEvent(event)
+    
+    def dragMoveEvent(self, event):
+        """Forward drag move events to the file list widget."""
+        if self.file_list:
+            self.file_list.dragMoveEvent(event)
+    
+    def dropEvent(self, event: QDropEvent):
+        """Forward drop events to the file list widget."""
+        if self.file_list:
+            self.file_list.dropEvent(event)
 
 def main():
     """Main application entry point."""
