@@ -535,7 +535,7 @@ class ElevenLabsBatchConverter(QMainWindow):
         
     def init_ui(self):
         """Set up the user interface."""
-        self.setWindowTitle("ElevenLabs Batch Voice Converter")
+        self.setWindowTitle("ElevenLabs Batch Voice Changer")
         self.setMinimumSize(800, 600)
         
         # Main widget and layout
@@ -754,13 +754,13 @@ class ElevenLabsBatchConverter(QMainWindow):
         control_buttons = QHBoxLayout()
         
         self.start_btn = QPushButton("Start Conversion")
-        self.start_btn = self.style_button(self.start_btn, 'fa5s.play', "Start Conversion")
+        self.start_btn = self.style_button(self.start_btn, 'fa5s.play', "Start Conversion", icon_color='#2ecc71')
         self.start_btn.clicked.connect(self.start_conversion)
         self.start_btn.setEnabled(False)  # Disabled until API connected
         control_buttons.addWidget(self.start_btn)
         
         self.cancel_btn = QPushButton("Cancel")
-        self.cancel_btn = self.style_button(self.cancel_btn, 'fa5s.stop', "Cancel")
+        self.cancel_btn = self.style_button(self.cancel_btn, 'fa5s.stop', "Cancel", icon_color='#e74c3c')
         self.cancel_btn.clicked.connect(self.cancel_conversion)
         self.cancel_btn.setEnabled(False)
         control_buttons.addWidget(self.cancel_btn)
@@ -783,12 +783,14 @@ class ElevenLabsBatchConverter(QMainWindow):
         if self.api_key:
             self.connect_api()
     
-    def style_button(self, button, icon_name, tooltip=""):
+    def style_button(self, button, icon_name, tooltip="", icon_color=None):
         """Apply a consistent style to a button with an icon."""
         button.setIcon(qta.icon(icon_name, color='white'))
         button.setIconSize(QSize(16, 16))
         if tooltip:
             button.setToolTip(tooltip)
+        if icon_color:
+            button.setStyleSheet(f"QPushButton {{ background-color: {icon_color}; }}")
         return button
     
     def toggle_api_key_visibility(self):
