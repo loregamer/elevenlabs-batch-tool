@@ -3,3 +3,4 @@
 .env
 /dist
 elevenlabs_batch_converter.spec
+/output
