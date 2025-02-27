@@ -127,7 +127,7 @@ class AudioFileWidget(QWidget):
         self.progress_bar.setFixedHeight(4)
         self.progress_bar.setStyleSheet("""
             QProgressBar {
-                background-color: #383a42;
+                background-color: #ecf0f1;
                 border-radius: 2px;
                 border: none;
             }
@@ -163,13 +163,12 @@ class AudioFileWidget(QWidget):
         # Add a subtle background
         self.setStyleSheet("""
             AudioFileWidget {
-                background-color: #2D3039;
+                background-color: rgba(52, 152, 219, 0.1);
                 border-radius: 4px;
                 margin: 2px;
-                color: white;
             }
             AudioFileWidget:hover {
-                background-color: #353845;
+                background-color: rgba(52, 152, 219, 0.2);
             }
             QPushButton {
                 background-color: #2c3e50;
@@ -177,9 +176,6 @@ class AudioFileWidget(QWidget):
             }
             QPushButton:hover {
                 background-color: #34495e;
-            }
-            QLabel {
-                color: white;
             }
         """)
         
@@ -348,9 +344,8 @@ class DragDropListWidget(QListWidget):
         self.accepted_extensions = accepted_extensions or [".mp3", ".wav", ".ogg", ".flac", ".m4a"]
         self.setStyleSheet("""
             DragDropListWidget {
-                border: 1px solid #3d3d3d;
+                border: 1px solid #bdc3c7;
                 border-radius: 4px;
-                background-color: #383a42;
             }
         """)
         self._default_stylesheet = self.styleSheet()
@@ -407,7 +402,7 @@ class DragDropListWidget(QListWidget):
                 self.setStyleSheet(self._default_stylesheet + """
                     DragDropListWidget {
                         border: 2px dashed #3498db;
-                        background-color: #2D3039;
+                        background-color: rgba(52, 152, 219, 0.1);
                     }
                 """)
             else:
@@ -530,14 +525,13 @@ class SplashScreen(QSplashScreen):
     def __init__(self):
         # Create a pixmap for the splash screen
         splash_pixmap = QPixmap(400, 300)
-        splash_pixmap.fill(QColor("#292B32"))  # Dark background to match app theme
+        splash_pixmap.fill(QColor("#2c3e50"))  # Dark blue background to match app theme
         
         super().__init__(splash_pixmap)
         
         # Create a container widget for the content
         self.container = QWidget()
         self.container.setFixedSize(400, 300)
-        self.container.setStyleSheet("background-color: #292B32; color: white;")
         
         # Set up the layout for the splash screen
         self.layout = QVBoxLayout(self.container)
@@ -593,12 +587,13 @@ class SplashScreen(QSplashScreen):
         title_font.setBold(True)
         title_label.setFont(title_font)
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title_label.setStyleSheet("color: white;")
         self.layout.addWidget(title_label)
         
         # Add version
         version_label = QLabel(f"Version {APP_VERSION}")
         version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        version_label.setStyleSheet("color: #a0a0a0;")  # Lighter gray color for better visibility
+        version_label.setStyleSheet("color: #bdc3c7;")  # Light gray color
         self.layout.addWidget(version_label)
         
         # Add loading text
@@ -614,7 +609,7 @@ class SplashScreen(QSplashScreen):
         self.progress_bar.setTextVisible(False)
         self.progress_bar.setStyleSheet("""
             QProgressBar {
-                background-color: #383a42;
+                background-color: #34495e;
                 border-radius: 5px;
                 text-align: center;
                 height: 10px;
@@ -691,10 +686,6 @@ class ElevenLabsBatchConverter(QMainWindow):
         
         # Set application style
         self.setStyleSheet("""
-            QWidget {
-                background-color: #292B32;
-                color: white;
-            }
             QPushButton {
                 padding: 5px;
                 border-radius: 4px;
@@ -710,7 +701,7 @@ class ElevenLabsBatchConverter(QMainWindow):
             }
             QGroupBox {
                 font-weight: bold;
-                border: 1px solid #3d3d3d;
+                border: 1px solid #bdc3c7;
                 border-radius: 5px;
                 margin-top: 1ex;
                 padding-top: 10px;
@@ -719,37 +710,6 @@ class ElevenLabsBatchConverter(QMainWindow):
                 subcontrol-origin: margin;
                 subcontrol-position: top center;
                 padding: 0 5px;
-            }
-            QComboBox, QLineEdit {
-                background-color: #383a42;
-                border: 1px solid #3d3d3d;
-                border-radius: 3px;
-                padding: 3px;
-                color: white;
-            }
-            QListWidget, QListView {
-                background-color: #383a42;
-                border: 1px solid #3d3d3d;
-                border-radius: 3px;
-            }
-            QProgressBar {
-                background-color: #383a42;
-                border: 1px solid #3d3d3d;
-                border-radius: 3px;
-                text-align: center;
-            }
-            QProgressBar::chunk {
-                background-color: #3498db;
-            }
-            QSlider::groove:horizontal {
-                background-color: #383a42;
-                height: 4px;
-            }
-            QSlider::handle:horizontal {
-                background-color: #3498db;
-                width: 12px;
-                margin: -4px 0;
-                border-radius: 6px;
             }
         """)
         
@@ -818,7 +778,7 @@ class ElevenLabsBatchConverter(QMainWindow):
         # Add a label to indicate drag and drop functionality
         drag_drop_label = QLabel("Drag and drop audio files here")
         drag_drop_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        drag_drop_label.setStyleSheet("color: #a0a0a0; font-style: italic;")
+        drag_drop_label.setStyleSheet("color: #7f8c8d; font-style: italic;")
         file_layout.addWidget(drag_drop_label)
         
         # File buttons
@@ -1394,7 +1354,7 @@ def create_logo_file():
             
             # Draw a circular background
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor("#292B32"))  # Match app background color
+            painter.setBrush(QColor("#2c3e50"))  # Dark blue background
             painter.drawEllipse(25, 25, 150, 150)
             
             # Create a microphone icon
