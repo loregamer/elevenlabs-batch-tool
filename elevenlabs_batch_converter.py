@@ -74,7 +74,7 @@ class AudioFileWidget(QWidget):
         
         # Index number
         self.index_label = QLabel(f"{self.index+1}.")
-        self.index_label.setFixedWidth(15)  # Further reduced from 20 to 15
+        self.index_label.setFixedWidth(15)
         self.index_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         font = QFont()
         font.setBold(True)
@@ -88,7 +88,7 @@ class AudioFileWidget(QWidget):
         # File name with ellipsis but preserving extension
         self.name_label = QLabel(self.ellipsify_filename(self.file_name, 40))
         self.name_label.setFont(font)
-        self.name_label.setToolTip(self.file_name)  # Add tooltip with full filename
+        self.name_label.setToolTip(self.file_name)
         info_layout.addWidget(self.name_label)
         
         # File details in a single line
@@ -140,53 +140,13 @@ class AudioFileWidget(QWidget):
         
         layout.addLayout(info_layout, 1)  # Give the info section more space
         
-        # Controls on the right
-        controls_layout = QHBoxLayout()
-        controls_layout.setSpacing(4)
-        
         # Play/Pause button
         self.play_button = QPushButton()
         self.play_button.setIcon(qta.icon('fa5s.play', color='white'))
-        self.play_button.setFixedSize(32, 32)
+        self.play_button.setFixedSize(36, 36)  # Slightly larger button
         self.play_button.setToolTip("Play/Pause")
         self.play_button.clicked.connect(self.toggle_playback)
-        controls_layout.addWidget(self.play_button)
-        
-        # Volume button (with popup slider)
-        self.volume_button = QPushButton()
-        self.volume_button.setIcon(qta.icon('fa5s.volume-up', color='white'))
-        self.volume_button.setFixedSize(32, 32)
-        self.volume_button.setToolTip("Volume")
-        self.volume_button.clicked.connect(self.toggle_mute)
-        controls_layout.addWidget(self.volume_button)
-        
-        # Volume slider (horizontal, shown in a popup)
-        self.volume_slider = QSlider(Qt.Orientation.Horizontal)
-        self.volume_slider.setRange(0, 100)
-        self.volume_slider.setValue(100)  # Default to full volume
-        self.volume_slider.setFixedWidth(80)
-        self.volume_slider.setToolTip("Volume")
-        self.volume_slider.valueChanged.connect(self.set_volume)
-        
-        # Create a popup widget for the volume slider
-        self.volume_popup = QWidget(self)
-        popup_layout = QVBoxLayout(self.volume_popup)
-        popup_layout.setContentsMargins(5, 5, 5, 5)
-        popup_layout.addWidget(self.volume_slider)
-        self.volume_popup.setStyleSheet("""
-            QWidget {
-                background-color: #2c3e50;
-                border-radius: 4px;
-                border: 1px solid #34495e;
-            }
-        """)
-        self.volume_popup.hide()
-        
-        # Show volume popup when hovering over volume button
-        self.volume_button.enterEvent = lambda e: self.show_volume_popup()
-        self.volume_popup.leaveEvent = lambda e: self.volume_popup.hide()
-        
-        layout.addLayout(controls_layout)
+        layout.addWidget(self.play_button)
         
         # Set the widget's size policy
         self.setSizePolicy(
@@ -209,7 +169,7 @@ class AudioFileWidget(QWidget):
             }
             QPushButton {
                 background-color: #2c3e50;
-                border-radius: 16px;
+                border-radius: 18px;  /* Adjusted for larger button */
             }
             QPushButton:hover {
                 background-color: #34495e;
@@ -218,7 +178,6 @@ class AudioFileWidget(QWidget):
         
         # Set initial volume
         self.audio_output.setVolume(1.0)
-        self.is_muted = False
         
         # Connect position update signal
         self.player.positionChanged.connect(self.update_position)
@@ -337,38 +296,6 @@ class AudioFileWidget(QWidget):
             self.position_label.setText(f"0:00 / {duration_str}")
             self.progress_bar.setValue(0)
 
-    def set_volume(self, value):
-        """Set the volume level."""
-        volume = value / 100.0
-        self.audio_output.setVolume(volume)
-        
-        # Update the volume icon based on the level
-        if value == 0:
-            self.volume_button.setIcon(qta.icon('fa5s.volume-mute', color='white'))
-        elif value < 30:
-            self.volume_button.setIcon(qta.icon('fa5s.volume-off', color='white'))
-        elif value < 70:
-            self.volume_button.setIcon(qta.icon('fa5s.volume-down', color='white'))
-        else:
-            self.volume_button.setIcon(qta.icon('fa5s.volume-up', color='white'))
-        
-        # If we're adjusting volume, we're no longer muted
-        if value > 0:
-            self.is_muted = False
-
-    def toggle_mute(self):
-        """Toggle mute/unmute."""
-        if self.is_muted:
-            # Restore previous volume
-            self.audio_output.setVolume(self.volume_slider.value() / 100.0)
-            self.volume_button.setIcon(qta.icon('fa5s.volume-up', color='white'))
-            self.is_muted = False
-        else:
-            # Mute the audio
-            self.audio_output.setVolume(0.0)
-            self.volume_button.setIcon(qta.icon('fa5s.volume-mute', color='white'))
-            self.is_muted = True
-
     def seek_to_position(self, percent):
         """Seek to a position in the audio file."""
         if self.player.duration() > 0:
@@ -379,14 +306,6 @@ class AudioFileWidget(QWidget):
             # If not playing, start playback
             if not self.is_playing:
                 self.play()
-
-    def show_volume_popup(self):
-        """Show the volume popup near the volume button."""
-        button_pos = self.volume_button.pos()
-        popup_x = button_pos.x() - self.volume_popup.width() + self.volume_button.width()
-        popup_y = button_pos.y() + self.volume_button.height()
-        self.volume_popup.move(popup_x, popup_y)
-        self.volume_popup.show()
 
     def set_index(self, index):
         """Update the index number."""
