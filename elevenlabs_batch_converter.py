@@ -447,7 +447,7 @@ class DragDropListWidget(QListWidget):
 class ConversionWorker(QThread):
     """Worker thread to handle audio conversion without blocking the UI."""
     progress_updated = pyqtSignal(int, int)  # (current, total)
-    conversion_complete = pyqtSignal(str, bool)  # (file_path, success)
+    conversion_complete = pyqtSignal(str, bool, dict)  # (file_path, success, token_info)
     conversion_finished = pyqtSignal()  # All conversions complete
     
     def __init__(self, api, voice_id, file_list, model_id, speaker_boost, remove_background_noise, 
@@ -485,7 +485,7 @@ class ConversionWorker(QThread):
                 output_path = output_dir / f"{file_name}"
                 
                 # Convert the file
-                audio_data = self.api.convert_speech_to_speech(
+                audio_data, token_info = self.api.convert_speech_to_speech(
                     voice_id=self.voice_id,
                     audio_file_path=file_path,
                     model_id=self.model_id,
@@ -501,13 +501,13 @@ class ConversionWorker(QThread):
                     with open(output_path, "wb") as f:
                         f.write(audio_data)
                     
-                    self.conversion_complete.emit(str(output_path), True)
+                    self.conversion_complete.emit(str(output_path), True, token_info or {})
                 else:
-                    self.conversion_complete.emit(file_path, False)
+                    self.conversion_complete.emit(file_path, False, {})
             
             except Exception as e:
                 logger.error(f"Error converting {file_path}: {str(e)}")
-                self.conversion_complete.emit(file_path, False)
+                self.conversion_complete.emit(file_path, False, {})
         
         self.progress_updated.emit(total_files, total_files)
         self.conversion_finished.emit()
@@ -1049,13 +1049,24 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.progress_bar.setValue(progress_percent)
         self.status_label.setText(f"Converting file {current+1} of {total}")
     
-    def add_conversion_result(self, file_path, success):
+    def add_conversion_result(self, file_path, success, token_info):
         """Add a conversion result to the results list."""
         file_name = os.path.basename(file_path)
         item = QListWidgetItem()
         
+        # Ellipsify the filename
+        ellipsified_name = self.ellipsify_filename(file_name, 30)
+        
+        # Format token information
+        token_text = ""
+        if success and token_info:
+            if 'characters_used' in token_info:
+                token_text = f" ({token_info['characters_used']} chars)"
+            elif 'estimated_characters' in token_info:
+                token_text = f" (~{token_info['estimated_characters']} chars)"
+        
         if success:
-            item.setText(f"✓ {file_name}")
+            item.setText(f"✓ {ellipsified_name}{token_text}")
             item.setForeground(Qt.GlobalColor.darkGreen)
             
             # Update credits display after each successful conversion
@@ -1064,7 +1075,7 @@ class ElevenLabsBatchConverter(QMainWindow):
             # Process events to ensure UI updates
             QApplication.processEvents()
         else:
-            item.setText(f"✗ {file_name}")
+            item.setText(f"✗ {ellipsified_name}")
             item.setForeground(Qt.GlobalColor.red)
         
         item.setData(Qt.ItemDataRole.UserRole, file_path)
@@ -1162,6 +1173,26 @@ class ElevenLabsBatchConverter(QMainWindow):
         
         # Accept the close event
         event.accept()
+
+    def ellipsify_filename(self, filename, max_length=30):
+        """Ellipsify a filename while preserving the extension."""
+        if len(filename) <= max_length:
+            return filename
+        
+        # Split the filename into name and extension
+        name, ext = os.path.splitext(filename)
+        
+        # Calculate how many characters we can keep from the name
+        # We need to account for the ellipsis "..." (3 chars) and the extension
+        chars_to_keep = max_length - 3 - len(ext)
+        
+        # If we can't even fit a single character plus ellipsis plus extension,
+        # just truncate the whole thing
+        if chars_to_keep < 1:
+            return filename[:max_length-3] + "..."
+        
+        # Otherwise, keep the start of the name, add ellipsis, and keep the extension
+        return name[:chars_to_keep] + "..." + ext
 
 def main():
     """Main application entry point."""

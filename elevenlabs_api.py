@@ -101,7 +101,7 @@ class ElevenLabsAPI:
             style (float): Value between 0 and 1 that affects the style exaggeration of the voice (default: 0.0)
             
         Returns:
-            bytes: The converted audio data if successful, None otherwise
+            tuple: (bytes, dict) The converted audio data and token usage info if successful, (None, None) otherwise
         """
         try:
             url = f"{self.BASE_URL}/speech-to-speech/{voice_id}"
@@ -145,16 +145,35 @@ class ElevenLabsAPI:
             files["audio"].close()
             
             response.raise_for_status()
-            return response.content
+            
+            # Get token usage information from the response headers
+            token_info = {}
+            
+            # Check for token usage in headers (ElevenLabs might include this in headers)
+            if 'x-characters-used' in response.headers:
+                token_info['characters_used'] = response.headers['x-characters-used']
+            
+            # If no header info, estimate based on audio duration
+            if not token_info:
+                # Get the audio file size in MB as a rough estimate
+                file_size_mb = os.path.getsize(audio_file_path) / (1024 * 1024)
+                # Rough estimate: 1MB of audio ≈ 100 tokens (this is an approximation)
+                estimated_tokens = int(file_size_mb * 100)
+                token_info['estimated_characters'] = estimated_tokens
+            
+            # Get updated subscription info to calculate tokens used
+            before_credits = self.get_remaining_credits()
+            
+            return response.content, token_info
             
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Error converting speech: {e}")
             if 'response' in locals() and response.content:
                 self.logger.error(f"Error details: {response.content.decode('utf-8', errors='ignore')}")
-            return None
+            return None, None
         except Exception as e:
             self.logger.error(f"Unexpected error: {e}")
-            return None
+            return None, None
     
     def get_voice_options(self):
         """Get a list of voices with their IDs and names for display in UI."""
