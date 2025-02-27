@@ -3,4 +3,5 @@ requests==2.31.0
 python-dotenv==1.0.0
 tqdm==4.66.1
 keyring==24.2.0
-qtawesome==1.2.3 
+qtawesome==1.2.3
+mutagen==1.47.0 
