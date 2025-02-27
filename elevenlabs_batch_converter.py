@@ -1391,32 +1391,37 @@ def main():
     # Process events to make sure splash screen is displayed
     app.processEvents()
     
+    # Update splash screen with loading messages
+    def update_splash_message(message):
+        splash.loading_label.setText(message)
+        app.processEvents()  # Process events to update the UI
+    
     # Load resources with progress updates
-    splash.showMessage("Initializing application...")
+    update_splash_message("Initializing application...")
     time.sleep(0.5)  # Small delay to show the message
     
     # Create logo file if it doesn't exist
-    splash.showMessage("Creating resources...")
+    update_splash_message("Creating resources...")
     create_logo_file()
     time.sleep(0.5)  # Small delay to show the message
     
     # Create main window but don't show it yet
-    splash.showMessage("Creating user interface...")
+    update_splash_message("Creating user interface...")
     window = ElevenLabsBatchConverter()
     time.sleep(0.5)  # Small delay to show the message
     
     # Check for API key
-    splash.showMessage("Checking for saved credentials...")
+    update_splash_message("Checking for saved credentials...")
     time.sleep(0.5)  # Small delay to show the message
     
     # Create output directory if it doesn't exist
-    splash.showMessage("Setting up file system...")
+    update_splash_message("Setting up file system...")
     output_dir = Path("output")
     output_dir.mkdir(exist_ok=True)
     time.sleep(0.5)  # Small delay to show the message
     
     # Final loading step
-    splash.showMessage("Ready to launch!")
+    update_splash_message("Ready to launch!")
     time.sleep(0.5)  # Small delay to show the message
     
     # Close splash and show main window
