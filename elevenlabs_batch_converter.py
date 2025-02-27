@@ -6,12 +6,17 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QComboBox, QFileDialog, QListWidget,
     QProgressBar, QMessageBox, QGroupBox, QListWidgetItem, QStyle,
-    QSplitter, QFrame, QLineEdit, QFormLayout, QCheckBox, QSlider
+    QSplitter, QFrame, QLineEdit, QFormLayout, QCheckBox, QSlider,
+    QSizePolicy, QStyledItemDelegate, QAbstractItemView
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize, QUrl, QMimeData
 from PyQt6.QtGui import QIcon, QFont, QColor, QDragEnterEvent, QDropEvent
+from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 import keyring
 import qtawesome as qta
+import mutagen
+from mutagen.wave import WAVE
+import time
 
 from elevenlabs_api import ElevenLabsAPI
 
@@ -23,6 +28,321 @@ logger = logging.getLogger("BatchConverter")
 # Constants for keyring
 APP_NAME = "ElevenLabsBatchConverter"
 KEY_NAME = "ElevenLabsAPIKey"
+
+class ClickableProgressBar(QProgressBar):
+    """A progress bar that can be clicked to seek to a position."""
+    
+    clicked = pyqtSignal(int)  # Signal emitted when clicked, with position percentage
+    
+    def mousePressEvent(self, event):
+        """Handle mouse press events."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            # Calculate the percentage of the width where the click occurred
+            position_percent = (event.position().x() / self.width()) * 100
+            self.clicked.emit(int(position_percent))
+        
+        super().mousePressEvent(event)
+
+class AudioFileWidget(QWidget):
+    """Custom widget to display audio file information with controls."""
+    
+    def __init__(self, file_path, parent=None):
+        super().__init__(parent)
+        self.file_path = file_path
+        self.file_name = os.path.basename(file_path)
+        self.is_playing = False
+        
+        # Set up media player
+        self.audio_output = QAudioOutput()
+        self.player = QMediaPlayer()
+        self.player.setAudioOutput(self.audio_output)
+        self.player.sourceChanged.connect(self.handle_source_changed)
+        self.player.playbackStateChanged.connect(self.handle_state_changed)
+        self.player.errorOccurred.connect(self.handle_error)
+        
+        # Get audio duration
+        self.duration = self.get_audio_duration()
+        
+        self.init_ui()
+    
+    def init_ui(self):
+        """Set up the widget UI."""
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(5, 5, 5, 5)
+        
+        # Control buttons layout
+        control_layout = QVBoxLayout()
+        control_layout.setSpacing(2)
+        
+        # Play button
+        self.play_button = QPushButton()
+        self.play_button.setIcon(qta.icon('fa5s.play', color='white'))
+        self.play_button.setFixedSize(32, 32)
+        self.play_button.setToolTip("Play/Pause")
+        self.play_button.clicked.connect(self.toggle_playback)
+        control_layout.addWidget(self.play_button)
+        
+        # Stop button
+        self.stop_button = QPushButton()
+        self.stop_button.setIcon(qta.icon('fa5s.stop', color='white'))
+        self.stop_button.setFixedSize(32, 32)
+        self.stop_button.setToolTip("Stop")
+        self.stop_button.clicked.connect(self.stop)
+        control_layout.addWidget(self.stop_button)
+        
+        layout.addLayout(control_layout)
+        
+        # File info
+        info_layout = QVBoxLayout()
+        
+        # File name
+        self.name_label = QLabel(self.file_name)
+        font = QFont()
+        font.setBold(True)
+        self.name_label.setFont(font)
+        info_layout.addWidget(self.name_label)
+        
+        # Progress bar
+        self.progress_bar = ClickableProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setFixedHeight(6)
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                background-color: #ecf0f1;
+                border-radius: 2px;
+                border: none;
+            }
+            QProgressBar::chunk {
+                background-color: #3498db;
+                border-radius: 2px;
+            }
+        """)
+        self.progress_bar.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.progress_bar.clicked.connect(self.seek_to_position)
+        info_layout.addWidget(self.progress_bar)
+        
+        # File details
+        details_layout = QHBoxLayout()
+        
+        # Duration
+        duration_str = self.format_duration(self.duration)
+        self.duration_label = QLabel(f"Duration: {duration_str}")
+        details_layout.addWidget(self.duration_label)
+        
+        # Current position
+        self.position_label = QLabel("0:00 / " + duration_str)
+        details_layout.addWidget(self.position_label)
+        
+        # File size
+        size_bytes = os.path.getsize(self.file_path)
+        size_mb = size_bytes / (1024 * 1024)
+        self.size_label = QLabel(f"Size: {size_mb:.2f} MB")
+        details_layout.addWidget(self.size_label)
+        
+        info_layout.addLayout(details_layout)
+        layout.addLayout(info_layout, 1)  # Give the info section more space
+        
+        # Volume control
+        volume_layout = QVBoxLayout()
+        volume_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Volume icon
+        self.volume_button = QPushButton()
+        self.volume_button.setIcon(qta.icon('fa5s.volume-up', color='white'))
+        self.volume_button.setFixedSize(32, 32)
+        self.volume_button.setToolTip("Mute/Unmute")
+        self.volume_button.clicked.connect(self.toggle_mute)
+        volume_layout.addWidget(self.volume_button)
+        
+        # Volume slider
+        self.volume_slider = QSlider(Qt.Orientation.Vertical)
+        self.volume_slider.setRange(0, 100)
+        self.volume_slider.setValue(100)  # Default to full volume
+        self.volume_slider.setFixedHeight(60)
+        self.volume_slider.setToolTip("Volume")
+        self.volume_slider.valueChanged.connect(self.set_volume)
+        volume_layout.addWidget(self.volume_slider)
+        
+        layout.addLayout(volume_layout)
+        
+        # Set the widget's size policy
+        self.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Fixed
+        )
+        
+        # Set a fixed height for the widget
+        self.setFixedHeight(80)
+        
+        # Add a subtle background
+        self.setStyleSheet("""
+            AudioFileWidget {
+                background-color: rgba(52, 152, 219, 0.1);
+                border-radius: 4px;
+                margin: 2px;
+            }
+            AudioFileWidget:hover {
+                background-color: rgba(52, 152, 219, 0.2);
+            }
+        """)
+        
+        # Set initial volume
+        self.audio_output.setVolume(1.0)
+        self.is_muted = False
+        
+        # Connect position update signal
+        self.player.positionChanged.connect(self.update_position)
+        self.player.durationChanged.connect(self.update_duration)
+    
+    def get_audio_duration(self):
+        """Get the duration of the audio file in seconds."""
+        try:
+            # Try using mutagen for common audio formats
+            if self.file_path.lower().endswith('.wav'):
+                audio = WAVE(self.file_path)
+                return audio.info.length
+            else:
+                # For other formats
+                audio = mutagen.File(self.file_path)
+                if audio is not None:
+                    return audio.info.length
+            
+            # Fallback: estimate based on file size (very rough)
+            return 0
+        except Exception as e:
+            logging.error(f"Error getting audio duration: {str(e)}")
+            return 0
+    
+    def format_duration(self, seconds):
+        """Format seconds into a readable time string."""
+        minutes, seconds = divmod(int(seconds), 60)
+        hours, minutes = divmod(minutes, 60)
+        
+        if hours > 0:
+            return f"{hours}:{minutes:02d}:{seconds:02d}"
+        else:
+            return f"{minutes}:{seconds:02d}"
+    
+    def toggle_playback(self):
+        """Toggle between play and pause."""
+        if not self.is_playing:
+            self.play()
+        else:
+            self.pause()
+    
+    def play(self):
+        """Play the audio file."""
+        # Stop all other audio files
+        parent_list = self.parent()
+        while parent_list and not isinstance(parent_list, QListWidget):
+            parent_list = parent_list.parent()
+        
+        if parent_list:
+            # Stop all other audio widgets
+            for i in range(parent_list.count()):
+                item = parent_list.item(i)
+                widget = parent_list.itemWidget(item)
+                if widget and isinstance(widget, AudioFileWidget) and widget != self:
+                    widget.stop()
+        
+        if self.player.source() != QUrl.fromLocalFile(self.file_path):
+            self.player.setSource(QUrl.fromLocalFile(self.file_path))
+        
+        self.player.play()
+    
+    def pause(self):
+        """Pause playback."""
+        self.player.pause()
+    
+    def stop(self):
+        """Stop playback."""
+        self.player.stop()
+    
+    def handle_source_changed(self, source):
+        """Handle when the media source changes."""
+        pass
+    
+    def handle_state_changed(self, state):
+        """Handle when the playback state changes."""
+        if state == QMediaPlayer.PlaybackState.PlayingState:
+            self.is_playing = True
+            self.play_button.setIcon(qta.icon('fa5s.pause', color='white'))
+        else:
+            self.is_playing = False
+            self.play_button.setIcon(qta.icon('fa5s.play', color='white'))
+    
+    def handle_error(self, error, error_string):
+        """Handle media player errors."""
+        logging.error(f"Media player error: {error_string}")
+        QMessageBox.warning(self, "Playback Error", 
+                          f"Error playing audio file: {error_string}")
+
+    def update_position(self, position):
+        """Update the position indicator."""
+        if self.player.duration() > 0:
+            progress = int((position / self.player.duration()) * 100)
+            self.progress_bar.setValue(progress)
+            
+            # Update position label
+            position_str = self.format_duration(position / 1000)  # Convert ms to seconds
+            duration_str = self.format_duration(self.player.duration() / 1000)
+            self.position_label.setText(f"{position_str} / {duration_str}")
+
+    def update_duration(self, duration):
+        """Update the duration display when media is loaded."""
+        if duration > 0:
+            self.duration = duration / 1000  # Convert ms to seconds
+            duration_str = self.format_duration(self.duration)
+            self.duration_label.setText(f"Duration: {duration_str}")
+            
+            # Reset position display
+            self.position_label.setText(f"0:00 / {duration_str}")
+            self.progress_bar.setValue(0)
+
+    def set_volume(self, value):
+        """Set the volume level."""
+        volume = value / 100.0
+        self.audio_output.setVolume(volume)
+        
+        # Update the volume icon based on the level
+        if value == 0:
+            self.volume_button.setIcon(qta.icon('fa5s.volume-mute', color='white'))
+        elif value < 30:
+            self.volume_button.setIcon(qta.icon('fa5s.volume-off', color='white'))
+        elif value < 70:
+            self.volume_button.setIcon(qta.icon('fa5s.volume-down', color='white'))
+        else:
+            self.volume_button.setIcon(qta.icon('fa5s.volume-up', color='white'))
+        
+        # If we're adjusting volume, we're no longer muted
+        if value > 0:
+            self.is_muted = False
+
+    def toggle_mute(self):
+        """Toggle mute/unmute."""
+        if self.is_muted:
+            # Restore previous volume
+            self.audio_output.setVolume(self.volume_slider.value() / 100.0)
+            self.volume_button.setIcon(qta.icon('fa5s.volume-up', color='white'))
+            self.is_muted = False
+        else:
+            # Mute the audio
+            self.audio_output.setVolume(0.0)
+            self.volume_button.setIcon(qta.icon('fa5s.volume-mute', color='white'))
+            self.is_muted = True
+
+    def seek_to_position(self, percent):
+        """Seek to a position in the audio file."""
+        if self.player.duration() > 0:
+            # Calculate the position in milliseconds
+            position = int((percent / 100.0) * self.player.duration())
+            self.player.setPosition(position)
+            
+            # If not playing, start playback
+            if not self.is_playing:
+                self.play()
 
 class DragDropListWidget(QListWidget):
     """Custom QListWidget that supports drag and drop of audio files."""
@@ -39,6 +359,14 @@ class DragDropListWidget(QListWidget):
         """)
         self._default_stylesheet = self.styleSheet()
         self._drag_active = False
+        
+        # Set item delegate properties for custom widgets
+        self.setItemDelegate(QStyledItemDelegate())
+        self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        
+        # Set spacing between items
+        self.setSpacing(2)
         
     def dragEnterEvent(self, event: QDragEnterEvent):
         """Handle drag enter events for files."""
@@ -102,9 +430,21 @@ class DragDropListWidget(QListWidget):
                          for i in range(self.count())]
         
         if file_path not in existing_items:
-            item = QListWidgetItem(os.path.basename(file_path))
+            # Create a custom widget for the audio file
+            audio_widget = AudioFileWidget(file_path)
+            
+            # Create a list item to hold the widget
+            item = QListWidgetItem(self)
             item.setData(Qt.ItemDataRole.UserRole, file_path)
+            
+            # Set the size of the item to match the widget
+            item.setSizeHint(audio_widget.sizeHint())
+            
+            # Add the item to the list
             self.addItem(item)
+            
+            # Set the widget for the item
+            self.setItemWidget(item, audio_widget)
 
 class ConversionWorker(QThread):
     """Worker thread to handle audio conversion without blocking the UI."""
@@ -593,10 +933,21 @@ class ElevenLabsBatchConverter(QMainWindow):
         """Remove the selected file from the list."""
         selected_items = self.file_list.selectedItems()
         for item in selected_items:
+            # Stop playback if the item has a widget
+            widget = self.file_list.itemWidget(item)
+            if widget and isinstance(widget, AudioFileWidget):
+                widget.stop()
+            
             self.file_list.takeItem(self.file_list.row(item))
     
     def clear_files(self):
         """Clear all files from the list."""
+        # Stop playback for all items
+        for i in range(self.file_list.count()):
+            widget = self.file_list.itemWidget(self.file_list.item(i))
+            if widget and isinstance(widget, AudioFileWidget):
+                widget.stop()
+        
         self.file_list.clear()
     
     def update_stability_label(self, value):
@@ -787,6 +1138,17 @@ class ElevenLabsBatchConverter(QMainWindow):
         """Forward drop events to the file list widget."""
         if self.file_list:
             self.file_list.dropEvent(event)
+
+    def closeEvent(self, event):
+        """Handle the window close event."""
+        # Stop all audio playback
+        for i in range(self.file_list.count()):
+            widget = self.file_list.itemWidget(self.file_list.item(i))
+            if widget and isinstance(widget, AudioFileWidget):
+                widget.stop()
+        
+        # Accept the close event
+        event.accept()
 
 def main():
     """Main application entry point."""
