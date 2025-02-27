@@ -529,15 +529,15 @@ class SplashScreen(QSplashScreen):
         
         super().__init__(splash_pixmap)
         
+        # Create a container widget for the content
+        self.container = QWidget()
+        self.container.setFixedSize(400, 300)
+        
         # Set up the layout for the splash screen
-        self.layout = QVBoxLayout()
+        self.layout = QVBoxLayout(self.container)
         self.layout.setContentsMargins(20, 20, 20, 20)
         self.layout.setSpacing(10)
         self.layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
-        # Create a container widget to hold the layout
-        self.container = QWidget()
-        self.container.setLayout(self.layout)
         
         # Add logo/image
         try:
@@ -546,7 +546,9 @@ class SplashScreen(QSplashScreen):
             if os.path.exists(logo_path):
                 logo_label = QLabel()
                 logo_pixmap = QPixmap(logo_path)
-                logo_label.setPixmap(logo_pixmap.scaled(200, 200, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+                # Limit the logo size to ensure there's room for loading text and progress bar
+                scaled_pixmap = logo_pixmap.scaled(180, 140, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                logo_label.setPixmap(scaled_pixmap)
                 logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.layout.addWidget(logo_label)
             else:
@@ -632,8 +634,13 @@ class SplashScreen(QSplashScreen):
     
     def drawContents(self, painter):
         """Draw the contents of the splash screen."""
-        # Draw the container widget onto the splash screen
+        # Render the container widget onto the splash screen
         self.container.render(painter)
+        
+    def showMessage(self, message, alignment=Qt.AlignmentFlag.AlignLeft, color=Qt.GlobalColor.white):
+        """Override to update our custom loading label instead of using the default message display."""
+        self.loading_label.setText(message)
+        QApplication.processEvents()  # Make sure the UI updates
 
 class ElevenLabsBatchConverter(QMainWindow):
     """Main application window for the ElevenLabs Batch Converter."""
@@ -1384,37 +1391,32 @@ def main():
     # Process events to make sure splash screen is displayed
     app.processEvents()
     
-    # Update splash screen with loading messages
-    def update_splash_message(message):
-        splash.loading_label.setText(message)
-        app.processEvents()  # Process events to update the UI
-    
     # Load resources with progress updates
-    update_splash_message("Initializing application...")
+    splash.showMessage("Initializing application...")
     time.sleep(0.5)  # Small delay to show the message
     
     # Create logo file if it doesn't exist
-    update_splash_message("Creating resources...")
+    splash.showMessage("Creating resources...")
     create_logo_file()
     time.sleep(0.5)  # Small delay to show the message
     
     # Create main window but don't show it yet
-    update_splash_message("Creating user interface...")
+    splash.showMessage("Creating user interface...")
     window = ElevenLabsBatchConverter()
     time.sleep(0.5)  # Small delay to show the message
     
     # Check for API key
-    update_splash_message("Checking for saved credentials...")
+    splash.showMessage("Checking for saved credentials...")
     time.sleep(0.5)  # Small delay to show the message
     
     # Create output directory if it doesn't exist
-    update_splash_message("Setting up file system...")
+    splash.showMessage("Setting up file system...")
     output_dir = Path("output")
     output_dir.mkdir(exist_ok=True)
     time.sleep(0.5)  # Small delay to show the message
     
     # Final loading step
-    update_splash_message("Ready to launch!")
+    splash.showMessage("Ready to launch!")
     time.sleep(0.5)  # Small delay to show the message
     
     # Close splash and show main window
