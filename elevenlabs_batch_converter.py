@@ -604,7 +604,8 @@ class SplashScreen(QSplashScreen):
         
         # Add progress bar
         self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 0)  # Indeterminate progress
+        self.progress_bar.setRange(0, 100)  # Determinate progress (0-100%)
+        self.progress_bar.setValue(0)  # Start at 0%
         self.progress_bar.setTextVisible(False)
         self.progress_bar.setStyleSheet("""
             QProgressBar {
@@ -625,12 +626,17 @@ class SplashScreen(QSplashScreen):
         self.dot_timer = QTimer()
         self.dot_timer.timeout.connect(self.update_loading_text)
         self.dot_timer.start(500)  # Update every 500ms
+        
+        # Track the current step for progress bar
+        self.current_step = 0
+        self.total_steps = 6  # Total number of steps in the splash sequence
     
     def update_loading_text(self):
         """Update the loading text with animated dots."""
         self.dot_count = (self.dot_count + 1) % 4
         dots = "." * self.dot_count
         self.loading_label.setText(f"Loading{dots}")
+        self.repaint()  # Force the splash screen to redraw immediately
     
     def drawContents(self, painter):
         """Draw the contents of the splash screen."""
@@ -639,7 +645,16 @@ class SplashScreen(QSplashScreen):
         
     def showMessage(self, message, alignment=Qt.AlignmentFlag.AlignLeft, color=Qt.GlobalColor.white):
         """Override to update our custom loading label instead of using the default message display."""
+        # Update the loading text
         self.loading_label.setText(message)
+        
+        # Update the progress bar
+        self.current_step += 1
+        progress = min(int((self.current_step / self.total_steps) * 100), 100)
+        self.progress_bar.setValue(progress)
+        
+        # Force immediate repaint
+        self.repaint()
         QApplication.processEvents()  # Make sure the UI updates
 
 class ElevenLabsBatchConverter(QMainWindow):
@@ -1379,55 +1394,45 @@ def main():
     """Main application entry point."""
     app = QApplication(sys.argv)
     app.setStyle("Fusion")  # Use Fusion style for a modern look
-    
+
     # Set application icon
     app_icon = qta.icon('fa5s.microphone-alt', color='#3498db')
     app.setWindowIcon(app_icon)
-    
+
+    # Create main window but don't show it yet
+    window = ElevenLabsBatchConverter()
+
     # Create and show splash screen
     splash = SplashScreen()
     splash.show()
+
+    # Chain non-blocking timer calls to update splash messages
+    QTimer.singleShot(500, lambda: splash.showMessage("Initializing application...", Qt.AlignmentFlag.AlignCenter))
     
-    # Process events to make sure splash screen is displayed
-    app.processEvents()
+    # Create resources after showing the first message
+    def create_resources():
+        splash.showMessage("Creating resources...", Qt.AlignmentFlag.AlignCenter)
+        create_logo_file()
+    QTimer.singleShot(1000, create_resources)
     
-    # Update splash screen with loading messages
-    def update_splash_message(message):
-        splash.loading_label.setText(message)
-        app.processEvents()  # Process events to update the UI
+    QTimer.singleShot(1500, lambda: splash.showMessage("Creating user interface...", Qt.AlignmentFlag.AlignCenter))
+    QTimer.singleShot(2000, lambda: splash.showMessage("Checking for saved credentials...", Qt.AlignmentFlag.AlignCenter))
     
-    # Load resources with progress updates
-    update_splash_message("Initializing application...")
-    time.sleep(0.5)  # Small delay to show the message
+    # Set up file system after checking credentials
+    def setup_filesystem():
+        splash.showMessage("Setting up file system...", Qt.AlignmentFlag.AlignCenter)
+        output_dir = Path("output")
+        output_dir.mkdir(exist_ok=True)
+    QTimer.singleShot(2500, setup_filesystem)
     
-    # Create logo file if it doesn't exist
-    update_splash_message("Creating resources...")
-    create_logo_file()
-    time.sleep(0.5)  # Small delay to show the message
-    
-    # Create main window but don't show it yet
-    update_splash_message("Creating user interface...")
-    window = ElevenLabsBatchConverter()
-    time.sleep(0.5)  # Small delay to show the message
-    
-    # Check for API key
-    update_splash_message("Checking for saved credentials...")
-    time.sleep(0.5)  # Small delay to show the message
-    
-    # Create output directory if it doesn't exist
-    update_splash_message("Setting up file system...")
-    output_dir = Path("output")
-    output_dir.mkdir(exist_ok=True)
-    time.sleep(0.5)  # Small delay to show the message
-    
-    # Final loading step
-    update_splash_message("Ready to launch!")
-    time.sleep(0.5)  # Small delay to show the message
-    
-    # Close splash and show main window
-    splash.finish(window)
-    window.show()
-    
+    QTimer.singleShot(3000, lambda: splash.showMessage("Ready to launch!", Qt.AlignmentFlag.AlignCenter))
+
+    # After the splash sequence, finish splash and show the main window
+    def finish_splash():
+        splash.finish(window)
+        window.show()
+    QTimer.singleShot(3500, finish_splash)
+
     sys.exit(app.exec())
 
 if __name__ == "__main__":
