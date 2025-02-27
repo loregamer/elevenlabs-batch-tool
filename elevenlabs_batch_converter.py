@@ -21,7 +21,7 @@ import time
 from elevenlabs_api import ElevenLabsAPI
 
 # Application version
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.0"
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, 
@@ -587,7 +587,7 @@ class SplashScreen(QSplashScreen):
             pass
         
         # Add title
-        title_label = QLabel("ElevenLabs Batch Voice Converter")
+        title_label = QLabel("ElevenLabs Batch Voice Changer")
         title_font = QFont()
         title_font.setPointSize(16)
         title_font.setBold(True)
@@ -754,7 +754,7 @@ class ElevenLabsBatchConverter(QMainWindow):
         """)
         
         # Title
-        title_label = QLabel("ElevenLabs Batch Voice Converter")
+        title_label = QLabel("ElevenLabs Batch Voice Changer")
         title_font = QFont()
         title_font.setPointSize(16)
         title_font.setBold(True)
