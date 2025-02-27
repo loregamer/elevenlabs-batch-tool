@@ -1057,12 +1057,21 @@ class ElevenLabsBatchConverter(QMainWindow):
         if success:
             item.setText(f"✓ {file_name}")
             item.setForeground(Qt.GlobalColor.darkGreen)
+            
+            # Update credits display after each successful conversion
+            self.update_credits_display()
+            
+            # Process events to ensure UI updates
+            QApplication.processEvents()
         else:
             item.setText(f"✗ {file_name}")
             item.setForeground(Qt.GlobalColor.red)
         
         item.setData(Qt.ItemDataRole.UserRole, file_path)
         self.results_list.addItem(item)
+        
+        # Ensure the latest item is visible
+        self.results_list.scrollToItem(item)
     
     def conversion_finished(self):
         """Handle the completion of all conversions."""
@@ -1084,8 +1093,7 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.refresh_voices_btn.setEnabled(True)
         self.cancel_btn.setEnabled(False)
         
-        # Update credits display after conversion
-        self.update_credits_display()
+        # Credits display is already updated after each successful conversion
         
         # Count successful and failed conversions
         success_count = 0
