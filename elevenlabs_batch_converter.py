@@ -144,7 +144,7 @@ class ConversionWorker(QThread):
                 
                 # Get the filename and create the output path
                 file_name = os.path.basename(file_path)
-                output_path = output_dir / f"converted_{file_name}"
+                output_path = output_dir / f"{file_name}"
                 
                 # Convert the file
                 audio_data = self.api.convert_speech_to_speech(
