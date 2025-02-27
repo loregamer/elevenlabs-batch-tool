@@ -7,10 +7,10 @@ from PyQt6.QtWidgets import (
     QPushButton, QLabel, QComboBox, QFileDialog, QListWidget,
     QProgressBar, QMessageBox, QGroupBox, QListWidgetItem, QStyle,
     QSplitter, QFrame, QLineEdit, QFormLayout, QCheckBox, QSlider,
-    QSizePolicy, QStyledItemDelegate, QAbstractItemView
+    QSizePolicy, QStyledItemDelegate, QAbstractItemView, QSplashScreen
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize, QUrl, QMimeData
-from PyQt6.QtGui import QIcon, QFont, QColor, QDragEnterEvent, QDropEvent
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize, QUrl, QMimeData, QTimer
+from PyQt6.QtGui import QIcon, QFont, QColor, QDragEnterEvent, QDropEvent, QPixmap, QPainter
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 import keyring
 import qtawesome as qta
@@ -19,6 +19,9 @@ from mutagen.wave import WAVE
 import time
 
 from elevenlabs_api import ElevenLabsAPI
+
+# Application version
+APP_VERSION = "1.1.0"
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, 
@@ -516,6 +519,122 @@ class ConversionWorker(QThread):
         """Cancel the conversion process."""
         self.is_cancelled = True
 
+class SplashScreen(QSplashScreen):
+    """Custom splash screen with loading animation."""
+    
+    def __init__(self):
+        # Create a pixmap for the splash screen
+        splash_pixmap = QPixmap(400, 300)
+        splash_pixmap.fill(QColor("#2c3e50"))  # Dark blue background to match app theme
+        
+        super().__init__(splash_pixmap)
+        
+        # Set up the layout for the splash screen
+        self.layout = QVBoxLayout()
+        self.layout.setContentsMargins(20, 20, 20, 20)
+        self.layout.setSpacing(10)
+        self.layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        # Create a container widget to hold the layout
+        self.container = QWidget()
+        self.container.setLayout(self.layout)
+        
+        # Add logo/image
+        try:
+            # Try to load the logo image if it exists
+            logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "resources", "logo.png")
+            if os.path.exists(logo_path):
+                logo_label = QLabel()
+                logo_pixmap = QPixmap(logo_path)
+                logo_label.setPixmap(logo_pixmap.scaled(200, 200, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+                logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.layout.addWidget(logo_label)
+            else:
+                # If no logo file, create a simple logo using qtawesome
+                icon_label = QLabel()
+                # Create a pixmap for the icon
+                icon_pixmap = QPixmap(128, 128)
+                icon_pixmap.fill(Qt.GlobalColor.transparent)
+                
+                # Create a microphone icon
+                mic_icon = qta.icon('fa5s.microphone-alt', color='#3498db')
+                mic_pixmap = mic_icon.pixmap(80, 80)
+                
+                # Create a sound wave icon
+                wave_icon = qta.icon('fa5s.wave-square', color='#2ecc71')
+                wave_pixmap = wave_icon.pixmap(60, 60)
+                
+                # Paint both icons onto the pixmap
+                painter = QPainter(icon_pixmap)
+                painter.drawPixmap(24, 10, mic_pixmap)  # Position the microphone
+                painter.drawPixmap(34, 70, wave_pixmap)  # Position the wave below
+                painter.end()
+                
+                icon_label.setPixmap(icon_pixmap)
+                icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.layout.addWidget(icon_label)
+        except Exception as e:
+            logger.error(f"Error loading splash screen image: {str(e)}")
+            # Fallback - just show text
+            pass
+        
+        # Add title
+        title_label = QLabel("ElevenLabs Batch Voice Converter")
+        title_font = QFont()
+        title_font.setPointSize(16)
+        title_font.setBold(True)
+        title_label.setFont(title_font)
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title_label.setStyleSheet("color: white;")
+        self.layout.addWidget(title_label)
+        
+        # Add version
+        version_label = QLabel(f"Version {APP_VERSION}")
+        version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        version_label.setStyleSheet("color: #bdc3c7;")  # Light gray color
+        self.layout.addWidget(version_label)
+        
+        # Add loading text
+        self.loading_label = QLabel("Loading...")
+        self.loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.loading_label.setStyleSheet("color: white;")
+        self.layout.addWidget(self.loading_label)
+        
+        # Add progress bar
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 0)  # Indeterminate progress
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                background-color: #34495e;
+                border-radius: 5px;
+                text-align: center;
+                height: 10px;
+            }
+            QProgressBar::chunk {
+                background-color: #3498db;
+                border-radius: 5px;
+            }
+        """)
+        self.layout.addWidget(self.progress_bar)
+        
+        # Set up animation dots for loading text
+        self.dot_count = 0
+        self.dot_timer = QTimer()
+        self.dot_timer.timeout.connect(self.update_loading_text)
+        self.dot_timer.start(500)  # Update every 500ms
+    
+    def update_loading_text(self):
+        """Update the loading text with animated dots."""
+        self.dot_count = (self.dot_count + 1) % 4
+        dots = "." * self.dot_count
+        self.loading_label.setText(f"Loading{dots}")
+    
+    def drawContents(self, painter):
+        """Draw the contents of the splash screen."""
+        # Draw the container widget onto the splash screen
+        self.container.render(painter)
+
 class ElevenLabsBatchConverter(QMainWindow):
     """Main application window for the ElevenLabs Batch Converter."""
     
@@ -535,7 +654,7 @@ class ElevenLabsBatchConverter(QMainWindow):
         
     def init_ui(self):
         """Set up the user interface."""
-        self.setWindowTitle("ElevenLabs Batch Voice Changer")
+        self.setWindowTitle(f"ElevenLabs Batch Voice Changer v{APP_VERSION}")
         self.setMinimumSize(800, 600)
         
         # Main widget and layout
@@ -1194,6 +1313,61 @@ class ElevenLabsBatchConverter(QMainWindow):
         # Otherwise, keep the start of the name, add ellipsis, and keep the extension
         return name[:chars_to_keep] + "..." + ext
 
+def create_logo_file():
+    """Create a logo file for the application if it doesn't exist."""
+    logo_dir = Path("resources")
+    logo_dir.mkdir(exist_ok=True)
+    
+    logo_path = logo_dir / "logo.png"
+    
+    # Only create the logo if it doesn't exist
+    if not logo_path.exists():
+        try:
+            # Create a pixmap for the logo
+            logo_pixmap = QPixmap(200, 200)
+            logo_pixmap.fill(Qt.GlobalColor.transparent)
+            
+            # Create a painter to draw on the pixmap
+            painter = QPainter(logo_pixmap)
+            
+            # Draw a circular background
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor("#2c3e50"))  # Dark blue background
+            painter.drawEllipse(25, 25, 150, 150)
+            
+            # Create a microphone icon
+            mic_icon = qta.icon('fa5s.microphone-alt', color='#3498db')
+            mic_pixmap = mic_icon.pixmap(100, 100)
+            
+            # Create a sound wave icon
+            wave_icon = qta.icon('fa5s.wave-square', color='#2ecc71')
+            wave_pixmap = wave_icon.pixmap(80, 80)
+            
+            # Paint both icons onto the pixmap
+            painter.drawPixmap(50, 30, mic_pixmap)  # Position the microphone
+            painter.drawPixmap(60, 110, wave_pixmap)  # Position the wave below
+            
+            # Add "ElevenLabs" text
+            painter.setPen(QColor("white"))
+            font = QFont()
+            font.setPointSize(12)
+            font.setBold(True)
+            painter.setFont(font)
+            painter.drawText(50, 180, "ElevenLabs")
+            
+            painter.end()
+            
+            # Save the pixmap to a file
+            logo_pixmap.save(str(logo_path))
+            logger.info(f"Created logo file at {logo_path}")
+            
+            return True
+        except Exception as e:
+            logger.error(f"Error creating logo file: {str(e)}")
+            return False
+    
+    return True
+
 def main():
     """Main application entry point."""
     app = QApplication(sys.argv)
@@ -1203,8 +1377,50 @@ def main():
     app_icon = qta.icon('fa5s.microphone-alt', color='#3498db')
     app.setWindowIcon(app_icon)
     
+    # Create and show splash screen
+    splash = SplashScreen()
+    splash.show()
+    
+    # Process events to make sure splash screen is displayed
+    app.processEvents()
+    
+    # Update splash screen with loading messages
+    def update_splash_message(message):
+        splash.loading_label.setText(message)
+        app.processEvents()  # Process events to update the UI
+    
+    # Load resources with progress updates
+    update_splash_message("Initializing application...")
+    time.sleep(0.5)  # Small delay to show the message
+    
+    # Create logo file if it doesn't exist
+    update_splash_message("Creating resources...")
+    create_logo_file()
+    time.sleep(0.5)  # Small delay to show the message
+    
+    # Create main window but don't show it yet
+    update_splash_message("Creating user interface...")
     window = ElevenLabsBatchConverter()
+    time.sleep(0.5)  # Small delay to show the message
+    
+    # Check for API key
+    update_splash_message("Checking for saved credentials...")
+    time.sleep(0.5)  # Small delay to show the message
+    
+    # Create output directory if it doesn't exist
+    update_splash_message("Setting up file system...")
+    output_dir = Path("output")
+    output_dir.mkdir(exist_ok=True)
+    time.sleep(0.5)  # Small delay to show the message
+    
+    # Final loading step
+    update_splash_message("Ready to launch!")
+    time.sleep(0.5)  # Small delay to show the message
+    
+    # Close splash and show main window
+    splash.finish(window)
     window.show()
+    
     sys.exit(app.exec())
 
 if __name__ == "__main__":
