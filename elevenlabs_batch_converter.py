@@ -783,14 +783,12 @@ class ElevenLabsBatchConverter(QMainWindow):
         if self.api_key:
             self.connect_api()
     
-    def style_button(self, button, icon_name, tooltip="", icon_color=None):
+    def style_button(self, button, icon_name, tooltip="", icon_color='white'):
         """Apply a consistent style to a button with an icon."""
-        button.setIcon(qta.icon(icon_name, color='white'))
+        button.setIcon(qta.icon(icon_name, color=icon_color))
         button.setIconSize(QSize(16, 16))
         if tooltip:
             button.setToolTip(tooltip)
-        if icon_color:
-            button.setStyleSheet(f"QPushButton {{ background-color: {icon_color}; }}")
         return button
     
     def toggle_api_key_visibility(self):
