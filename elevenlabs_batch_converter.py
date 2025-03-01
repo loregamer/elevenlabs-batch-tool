@@ -602,13 +602,43 @@ class ElevenLabsBatchConverter(QMainWindow):
         
     def init_ui(self):
         self.setWindowTitle(f"ElevenLabs Batch Voice Changer v{APP_VERSION}")
-        self.setMinimumSize(800, 800)
+        self.setMinimumSize(800, 600)
+        self.resize(850, 1000)  # Set initial window size
         
         main_widget = QWidget()
         main_layout = QVBoxLayout(main_widget)
         # Set stretch factors: API settings and title remain fixed,
         # the splitter gets all extra vertical space.
         self.setCentralWidget(main_widget)
+
+                # Set application style
+        self.setStyleSheet("""
+            QPushButton {
+                padding: 5px;
+                border-radius: 4px;
+                background-color: #2c3e50;
+                color: white;
+            }
+            QPushButton:hover {
+                background-color: #34495e;
+            }
+            QPushButton:disabled {
+                background-color: #7f8c8d;
+                color: #bdc3c7;
+            }
+            QGroupBox {
+                font-weight: bold;
+                border: 1px solid #bdc3c7;
+                border-radius: 5px;
+                margin-top: 1ex;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top center;
+                padding: 0 5px;
+            }
+        """)
         
         # Title
         title_label = QLabel("ElevenLabs Batch Voice Changer")
