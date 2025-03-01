@@ -519,7 +519,7 @@ class ConversionWorker(QThread):
                 # Determine the output file extension based on the format
                 if self.output_format.startswith("mp3"):
                     output_ext = ".mp3"
-                    format_info = self.output_format.split("_")[-1] + "kbps"  # Extract bitrate
+                    bit_depth = None  # Only needed for WAV format
                 elif self.output_format.startswith("flac"):
                     output_ext = ".flac"
                     bit_depth = 16
@@ -527,28 +527,24 @@ class ConversionWorker(QThread):
                         bit_depth = 24
                     elif "32" in self.output_format:
                         bit_depth = 32
-                    format_info = f"{bit_depth}bit"
                 elif self.output_format.startswith("pcm"):
                     output_ext = ".wav"
                     # Extract the bit depth from the format string
                     if "16000" in self.output_format:
                         bit_depth = 16
-                        format_info = "16bit"
                     elif "24000" in self.output_format:
                         bit_depth = 24
-                        format_info = "24bit"
                     elif "32000" in self.output_format:
                         bit_depth = 32
-                        format_info = "32bit"
                     else:
                         bit_depth = 32  # Use 32-bit as a safe default for compatibility
-                        format_info = "32bit"
                 else:
                     # Default to mp3 if format is unknown
                     output_ext = ".mp3"
-                    format_info = "128kbps"
+                    bit_depth = None
                 
-                output_path = output_dir / f"{base_name}_{format_info}{output_ext}"
+                # Use the original filename with the new extension
+                output_path = output_dir / f"{base_name}{output_ext}"
                 
                 # Convert the file
                 audio_data, token_info = self.api.convert_speech_to_speech(
@@ -1528,7 +1524,7 @@ class ElevenLabsBatchConverter(QMainWindow):
             f"Conversion process finished.\n\n"
             f"Successfully converted: {success_count} files\n"
             f"Failed conversions: {failed_count} files\n\n"
-            f"Output files are saved in the 'output' folder."
+            f"Output files are saved in the 'output' folder with their original filenames."
         )
         
         # Clean up the worker
