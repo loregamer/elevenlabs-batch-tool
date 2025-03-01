@@ -49,3 +49,35 @@ A GUI tool for batch processing audio files using ElevenLabs' voice conversion t
 
 `pip uninstall PyQt6 PyQt6-Qt6 PyQt6-sip pyqt6-tools`
 `pip install PyQt6==6.6.1 PyQt6-Qt6==6.6.1 PyQt6-sip`
+
+## To Do / Future Features
+
+The following features could be added to enhance the voice changing capabilities:
+
+### Voice Conversion Enhancements
+
+- **Voice Seed Parameter**: Add support for the `seed` parameter to enable deterministic voice generation for consistent results when converting the same audio multiple times.
+- **Voice Isolation Pre-processing**: Implement the ElevenLabs Audio Isolation API as a pre-processing step to clean up input audio before voice conversion.
+- **Clarity Boost**: Add support for the clarity boost parameter available in newer ElevenLabs models.
+- **Chunking for Large Files**: Implement chunking to process longer audio files in segments, improving reliability and potentially reducing processing time.
+- **Pronunciation Guide**: Add support for pronunciation dictionaries to improve specific word pronunciations.
+
+### Voice Creation and Management
+
+- **Voice Generation from Description**: Add the ability to generate custom voices from text descriptions using the Voice Generation API.
+- **Voice Cloning from Samples**: Allow users to create custom voices by uploading voice samples.
+- **Voice Library Management**: Add functionality to save, categorize, and manage favorite voices.
+
+### Advanced Processing
+
+- **Timestamps and Word-level Control**: Implement support for generating timestamps for each word, enabling more precise audio editing.
+- **Streaming Processing**: Add streaming support for real-time processing of audio files.
+- **Language Detection and Translation**: Automatically detect the source language and offer translation options.
+- **Batch Processing Optimization**: Implement parallel processing for multiple files to speed up batch conversions.
+
+### User Experience
+
+- **Audio Preview**: Add the ability to preview how a voice will sound before processing the entire file.
+- **Advanced Output Settings**: Provide more control over output audio quality, format, and compression.
+- **Preset Management**: Allow saving and loading of voice conversion presets.
+- **Progress Estimation**: Implement more accurate progress and time remaining estimates.
