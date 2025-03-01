@@ -7,7 +7,8 @@ from PyQt6.QtWidgets import (
     QPushButton, QLabel, QComboBox, QFileDialog, QListWidget,
     QProgressBar, QMessageBox, QGroupBox, QListWidgetItem, QStyle,
     QSplitter, QFrame, QLineEdit, QFormLayout, QCheckBox, QSlider,
-    QSizePolicy, QStyledItemDelegate, QAbstractItemView, QSplashScreen
+    QSizePolicy, QStyledItemDelegate, QAbstractItemView, QSplashScreen,
+    QScrollArea  # Added for improved resizing behavior
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize, QUrl, QMimeData, QTimer
 from PyQt6.QtGui import QIcon, QFont, QColor, QDragEnterEvent, QDropEvent, QPixmap, QPainter
@@ -836,7 +837,7 @@ class ElevenLabsBatchConverter(QMainWindow):
         
         main_layout.addWidget(api_key_group)
         
-        # Split the UI into left and right panels
+        # Create a splitter to divide left and right panels
         splitter = QSplitter(Qt.Orientation.Horizontal)
         main_layout.addWidget(splitter)
         
@@ -1018,9 +1019,12 @@ class ElevenLabsBatchConverter(QMainWindow):
         conversion_layout.addLayout(control_buttons)
         right_layout.addWidget(conversion_group)
         
-        # Add panels to splitter
+        # Wrap the right panel in a scroll area for better resizing support
+        right_scroll = QScrollArea()
+        right_scroll.setWidgetResizable(True)
+        right_scroll.setWidget(right_panel)
         splitter.addWidget(left_panel)
-        splitter.addWidget(right_panel)
+        splitter.addWidget(right_scroll)
         splitter.setSizes([400, 400])  # Equal initial sizes
         
         # Open output folder button
@@ -1769,6 +1773,11 @@ def create_logo_file():
 
 def main():
     """Main application entry point."""
+    # In Qt6 high DPI scaling is enabled by default.
+    # Optionally, set high DPI pixmap usage if available.
+    if hasattr(Qt.ApplicationAttribute, "AA_UseHighDpiPixmaps"):
+        QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
+    
     app = QApplication(sys.argv)
     app.setStyle("Fusion")  # Use Fusion style for a modern look
 
@@ -1813,4 +1822,4 @@ def main():
     sys.exit(app.exec())
 
 if __name__ == "__main__":
-    main() 
+    main()
