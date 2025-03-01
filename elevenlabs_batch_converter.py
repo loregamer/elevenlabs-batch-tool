@@ -32,6 +32,9 @@ logger = logging.getLogger("BatchConverter")
 # Constants for keyring
 APP_NAME = "ElevenLabsBatchConverter"
 KEY_NAME = "ElevenLabsAPIKey"
+VOICE_KEY = "SelectedVoiceID"
+MODEL_KEY = "SelectedModelID"
+FORMAT_KEY = "SelectedOutputFormat"
 
 class ClickableProgressBar(QProgressBar):
     """A progress bar that can be clicked to seek to a position."""
@@ -724,6 +727,11 @@ class ElevenLabsBatchConverter(QMainWindow):
         # Try to get API key from keyring
         self.api_key = keyring.get_password(APP_NAME, KEY_NAME) or ""
         
+        # Try to get saved preferences
+        self.saved_voice_id = keyring.get_password(APP_NAME, VOICE_KEY) or ""
+        self.saved_model_id = keyring.get_password(APP_NAME, MODEL_KEY) or ""
+        self.saved_output_format = keyring.get_password(APP_NAME, FORMAT_KEY) or ""
+        
         # Enable drag and drop for the main window
         self.setAcceptDrops(True)
         
@@ -866,11 +874,15 @@ class ElevenLabsBatchConverter(QMainWindow):
         
         voice_layout.addWidget(QLabel("Select Voice:"))
         self.voice_combo = QComboBox()
+        # Connect the combobox change signal to save preferences automatically
+        self.voice_combo.currentIndexChanged.connect(self.auto_save_preferences)
         voice_layout.addWidget(self.voice_combo)
         
         # Add model selection
         voice_layout.addWidget(QLabel("Select Model:"))
         self.model_combo = QComboBox()
+        # Connect the combobox change signal to save preferences automatically
+        self.model_combo.currentIndexChanged.connect(self.auto_save_preferences)
         voice_layout.addWidget(self.model_combo)
         
         # Add output format selection
@@ -884,6 +896,8 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.format_combo.addItem("WAV (24-bit, 44.1kHz)", "pcm_24000")
         self.format_combo.addItem("WAV (32-bit, 44.1kHz - Wwise Compatible)", "pcm_32000")
         self.format_combo.setCurrentIndex(0)  # Default to MP3 128kbps
+        # Connect the combobox change signal to save preferences automatically
+        self.format_combo.currentIndexChanged.connect(self.auto_save_preferences)
         self.format_combo.setToolTip("Select the output audio format and quality.\n"
                                     "MP3: Smaller file size, good for most uses.\n"
                                     "WAV: Lossless quality, larger file size.\n"
@@ -1029,6 +1043,34 @@ class ElevenLabsBatchConverter(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save API key: {str(e)}")
     
+    def auto_save_preferences(self):
+        """Automatically save preferences when user makes a selection.
+        This is called whenever the user changes voice, model, or format selections."""
+        # Only save if all combo boxes are populated (avoid saving during initial setup)
+        if (self.voice_combo.count() > 0 and 
+            self.model_combo.count() > 0 and 
+            self.format_combo.count() > 0 and
+            self.api is not None):  # Make sure API is connected
+            self.save_preferences()
+
+    def save_preferences(self):
+        """Save current voice, model, and format preferences to the system keyring."""
+        try:
+            # Get current selected values
+            if self.voice_combo.currentData():
+                keyring.set_password(APP_NAME, VOICE_KEY, self.voice_combo.currentData())
+            
+            if self.model_combo.currentData():
+                keyring.set_password(APP_NAME, MODEL_KEY, self.model_combo.currentData())
+            
+            if self.format_combo.currentData():
+                keyring.set_password(APP_NAME, FORMAT_KEY, self.format_combo.currentData())
+            
+            # Don't update status label during auto-save to avoid distracting the user
+            logger.info("Saved preferences to keyring")
+        except Exception as e:
+            logger.error(f"Error saving preferences: {str(e)}")
+    
     def connect_api(self):
         """Initialize the ElevenLabs API with the current key and load voices."""
         api_key = self.api_key_input.text().strip()
@@ -1102,6 +1144,10 @@ class ElevenLabsBatchConverter(QMainWindow):
         QApplication.processEvents()
         
         try:
+            # Temporarily disconnect auto-save signals to prevent excessive saves during loading
+            self.voice_combo.currentIndexChanged.disconnect(self.auto_save_preferences)
+            self.model_combo.currentIndexChanged.disconnect(self.auto_save_preferences)
+            
             # Load voices
             self.voices = self.api.get_voice_options()
             self.voice_combo.clear()
@@ -1110,21 +1156,68 @@ class ElevenLabsBatchConverter(QMainWindow):
                 self.status_label.setText("No voices found. Check your API key and connection.")
                 return
                 
-            for voice in self.voices:
+            # Track if we found the saved voice
+            found_saved_voice = False
+            saved_voice_index = 0
+
+            for i, voice in enumerate(self.voices):
                 self.voice_combo.addItem(voice["name"], voice["id"])
+                # If this is the previously saved voice, note its index
+                if voice["id"] == self.saved_voice_id:
+                    found_saved_voice = True
+                    saved_voice_index = i
+            
+            # Set the saved voice if found
+            if found_saved_voice:
+                self.voice_combo.setCurrentIndex(saved_voice_index)
             
             # Load models
             self.model_combo.clear()
             models = self.api.get_model_options()
-            for model in models:
+            
+            # Track if we found the saved model
+            found_saved_model = False
+            saved_model_index = 0
+            
+            for i, model in enumerate(models):
                 self.model_combo.addItem(model["name"], model["id"])
-                
+                # If this is the previously saved model, note its index
+                if model["id"] == self.saved_model_id:
+                    found_saved_model = True
+                    saved_model_index = i
+            
+            # Set the saved model if found
+            if found_saved_model:
+                self.model_combo.setCurrentIndex(saved_model_index)
+            
+            # Set the saved output format if it exists
+            if self.saved_output_format:
+                # Temporarily disconnect to prevent triggering auto-save
+                self.format_combo.currentIndexChanged.disconnect(self.auto_save_preferences)
+                for i in range(self.format_combo.count()):
+                    if self.format_combo.itemData(i) == self.saved_output_format:
+                        self.format_combo.setCurrentIndex(i)
+                        break
+                # Reconnect the signal
+                self.format_combo.currentIndexChanged.connect(self.auto_save_preferences)
+            
             self.status_label.setText(f"Loaded {len(self.voices)} voices and {len(models)} models")
             
             # Update credits display after loading voices
             self.update_credits_display()
             
+            # Reconnect auto-save signals
+            self.voice_combo.currentIndexChanged.connect(self.auto_save_preferences)
+            self.model_combo.currentIndexChanged.connect(self.auto_save_preferences)
+            
         except Exception as e:
+            # Ensure signals are reconnected even if there's an error
+            try:
+                self.voice_combo.currentIndexChanged.connect(self.auto_save_preferences)
+                self.model_combo.currentIndexChanged.connect(self.auto_save_preferences)
+                self.format_combo.currentIndexChanged.connect(self.auto_save_preferences)
+            except:
+                pass
             self.status_label.setText(f"Error loading voices: {str(e)}")
             logger.error(f"Error loading voices: {str(e)}")
     
@@ -1211,9 +1304,11 @@ class ElevenLabsBatchConverter(QMainWindow):
         # Get the selected output format
         output_format = self.format_combo.currentData()
         
+        # Preferences are already auto-saved when selections change, no need to save here
+        
         # Get all file paths from the list
         file_paths = [self.file_list.item(i).data(Qt.ItemDataRole.UserRole) 
-                      for i in range(self.file_list.count())]
+                     for i in range(self.file_list.count())]
         
         # Clear previous results
         self.results_list.clear()
