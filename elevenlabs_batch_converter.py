@@ -24,7 +24,7 @@ import json  # Add json import at the top of the file with other imports
 from elevenlabs_api import ElevenLabsAPI
 
 # Application version
-APP_VERSION = "1.2"
+APP_VERSION = "1.2.1"
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, 
