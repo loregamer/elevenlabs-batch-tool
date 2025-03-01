@@ -18,6 +18,7 @@ import mutagen
 from mutagen.wave import WAVE
 import time
 from pydub import AudioSegment
+import json  # Add json import at the top of the file with other imports
 
 from elevenlabs_api import ElevenLabsAPI
 
@@ -35,6 +36,7 @@ KEY_NAME = "ElevenLabsAPIKey"
 VOICE_KEY = "SelectedVoiceID"
 MODEL_KEY = "SelectedModelID"
 FORMAT_KEY = "SelectedOutputFormat"
+VOICE_SETTINGS_KEY = "VoiceSettings"  # This will store a JSON with voice-specific settings
 
 class ClickableProgressBar(QProgressBar):
     """A progress bar that can be clicked to seek to a position."""
@@ -732,6 +734,10 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.saved_model_id = keyring.get_password(APP_NAME, MODEL_KEY) or ""
         self.saved_output_format = keyring.get_password(APP_NAME, FORMAT_KEY) or ""
         
+        # Load voice-specific settings
+        self.voice_settings = {}
+        self.load_voice_settings()
+        
         # Enable drag and drop for the main window
         self.setAcceptDrops(True)
         
@@ -874,7 +880,8 @@ class ElevenLabsBatchConverter(QMainWindow):
         
         voice_layout.addWidget(QLabel("Select Voice:"))
         self.voice_combo = QComboBox()
-        # Connect the combobox change signal to save preferences automatically
+        # Connect voice combo change to load voice-specific settings FIRST, THEN auto_save_preferences
+        self.voice_combo.currentIndexChanged.connect(self.load_voice_specific_settings)
         self.voice_combo.currentIndexChanged.connect(self.auto_save_preferences)
         voice_layout.addWidget(self.voice_combo)
         
@@ -916,6 +923,7 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.stability_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
         self.stability_slider.setTickInterval(10)
         self.stability_slider.valueChanged.connect(self.update_stability_label)
+        self.stability_slider.valueChanged.connect(self.auto_save_preferences)
         settings_layout.addRow(self.stability_label, self.stability_slider)
         
         # Similarity Boost slider (0.0 to 1.0)
@@ -926,6 +934,7 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.similarity_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
         self.similarity_slider.setTickInterval(10)
         self.similarity_slider.valueChanged.connect(self.update_similarity_label)
+        self.similarity_slider.valueChanged.connect(self.auto_save_preferences)
         settings_layout.addRow(self.similarity_label, self.similarity_slider)
         
         # Style Exaggeration slider (0.0 to 1.0)
@@ -936,6 +945,7 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.style_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
         self.style_slider.setTickInterval(10)
         self.style_slider.valueChanged.connect(self.update_style_label)
+        self.style_slider.valueChanged.connect(self.auto_save_preferences)
         settings_layout.addRow(self.style_label, self.style_slider)
         
         voice_layout.addWidget(settings_group)
@@ -944,12 +954,14 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.speaker_boost_checkbox = QCheckBox("Speaker Boost")
         self.speaker_boost_checkbox.setChecked(True)  # Default to enabled
         self.speaker_boost_checkbox.setToolTip("Enhance the target speaker's voice")
+        self.speaker_boost_checkbox.stateChanged.connect(self.auto_save_preferences)
         voice_layout.addWidget(self.speaker_boost_checkbox)
         
         # Add background noise removal option
         self.remove_noise_checkbox = QCheckBox("Remove Silence")
         self.remove_noise_checkbox.setChecked(False)  # Default to disabled
         self.remove_noise_checkbox.setToolTip("Remove silence and background noise from the audio")
+        self.remove_noise_checkbox.stateChanged.connect(self.auto_save_preferences)
         voice_layout.addWidget(self.remove_noise_checkbox)
         
         self.refresh_voices_btn = QPushButton("Refresh Voices")
@@ -1009,6 +1021,9 @@ class ElevenLabsBatchConverter(QMainWindow):
         # If we already have an API key from keyring, connect automatically
         if self.api_key:
             self.connect_api()
+        
+        # Connect voice combo change to load voice-specific settings
+        self.voice_combo.currentIndexChanged.connect(self.load_voice_specific_settings)
     
     def style_button(self, button, icon_name, tooltip="", icon_color='white'):
         """Apply a consistent style to a button with an icon."""
@@ -1044,19 +1059,18 @@ class ElevenLabsBatchConverter(QMainWindow):
             QMessageBox.critical(self, "Error", f"Failed to save API key: {str(e)}")
     
     def auto_save_preferences(self):
-        """Automatically save preferences when user makes a selection.
-        This is called whenever the user changes voice, model, or format selections."""
-        # Only save if all combo boxes are populated (avoid saving during initial setup)
+        """Automatically save preferences when user makes a selection."""
+        # Only save if all combo boxes are populated and API is connected
         if (self.voice_combo.count() > 0 and 
             self.model_combo.count() > 0 and 
             self.format_combo.count() > 0 and
-            self.api is not None):  # Make sure API is connected
+            self.api is not None):
             self.save_preferences()
-
+    
     def save_preferences(self):
-        """Save current voice, model, and format preferences to the system keyring."""
+        """Save current preferences to the system keyring."""
         try:
-            # Get current selected values
+            # Save general preferences
             if self.voice_combo.currentData():
                 keyring.set_password(APP_NAME, VOICE_KEY, self.voice_combo.currentData())
             
@@ -1066,7 +1080,25 @@ class ElevenLabsBatchConverter(QMainWindow):
             if self.format_combo.currentData():
                 keyring.set_password(APP_NAME, FORMAT_KEY, self.format_combo.currentData())
             
-            # Don't update status label during auto-save to avoid distracting the user
+            # Save voice-specific settings if a voice is selected
+            voice_id = self.voice_combo.currentData()
+            if voice_id:
+                # Create or update settings for this voice
+                if voice_id not in self.voice_settings:
+                    self.voice_settings[voice_id] = {}
+                
+                # Store current settings
+                self.voice_settings[voice_id] = {
+                    'stability': self.stability_slider.value() / 100.0,
+                    'similarity_boost': self.similarity_slider.value() / 100.0,
+                    'style': self.style_slider.value() / 100.0,
+                    'speaker_boost': self.speaker_boost_checkbox.isChecked(),
+                    'remove_silence': self.remove_noise_checkbox.isChecked()
+                }
+                
+                # Save all voice settings
+                self.save_voice_settings()
+            
             logger.info("Saved preferences to keyring")
         except Exception as e:
             logger.error(f"Error saving preferences: {str(e)}")
@@ -1144,9 +1176,31 @@ class ElevenLabsBatchConverter(QMainWindow):
         QApplication.processEvents()
         
         try:
-            # Temporarily disconnect auto-save signals to prevent excessive saves during loading
-            self.voice_combo.currentIndexChanged.disconnect(self.auto_save_preferences)
-            self.model_combo.currentIndexChanged.disconnect(self.auto_save_preferences)
+            # Temporarily disconnect all auto-save signals
+            # First check if signals are connected before disconnecting
+            try:
+                self.voice_combo.currentIndexChanged.disconnect(self.load_voice_specific_settings)
+            except TypeError:
+                # Signal was not connected
+                pass
+                
+            try:
+                self.voice_combo.currentIndexChanged.disconnect(self.auto_save_preferences)
+            except TypeError:
+                # Signal was not connected
+                pass
+                
+            try:
+                self.model_combo.currentIndexChanged.disconnect(self.auto_save_preferences)
+            except TypeError:
+                # Signal was not connected
+                pass
+                
+            try:
+                self.format_combo.currentIndexChanged.disconnect(self.auto_save_preferences)
+            except TypeError:
+                # Signal was not connected
+                pass
             
             # Load voices
             self.voices = self.api.get_voice_options()
@@ -1167,10 +1221,6 @@ class ElevenLabsBatchConverter(QMainWindow):
                     found_saved_voice = True
                     saved_voice_index = i
             
-            # Set the saved voice if found
-            if found_saved_voice:
-                self.voice_combo.setCurrentIndex(saved_voice_index)
-            
             # Load models
             self.model_combo.clear()
             models = self.api.get_model_options()
@@ -1186,33 +1236,50 @@ class ElevenLabsBatchConverter(QMainWindow):
                     found_saved_model = True
                     saved_model_index = i
             
-            # Set the saved model if found
-            if found_saved_model:
-                self.model_combo.setCurrentIndex(saved_model_index)
-            
             # Set the saved output format if it exists
             if self.saved_output_format:
                 # Temporarily disconnect to prevent triggering auto-save
-                self.format_combo.currentIndexChanged.disconnect(self.auto_save_preferences)
+                try:
+                    self.format_combo.currentIndexChanged.disconnect(self.auto_save_preferences)
+                except TypeError:
+                    pass
+                    
                 for i in range(self.format_combo.count()):
                     if self.format_combo.itemData(i) == self.saved_output_format:
                         self.format_combo.setCurrentIndex(i)
                         break
+                        
                 # Reconnect the signal
                 self.format_combo.currentIndexChanged.connect(self.auto_save_preferences)
-            
-            self.status_label.setText(f"Loaded {len(self.voices)} voices and {len(models)} models")
             
             # Update credits display after loading voices
             self.update_credits_display()
             
-            # Reconnect auto-save signals
+            # Reconnect signals in the correct order - first load settings, then auto-save
+            self.voice_combo.currentIndexChanged.connect(self.load_voice_specific_settings)
             self.voice_combo.currentIndexChanged.connect(self.auto_save_preferences)
             self.model_combo.currentIndexChanged.connect(self.auto_save_preferences)
+            
+            self.status_label.setText(f"Loaded {len(self.voices)} voices and {len(models)} models")
+            
+            # Now that signals are connected, set the current selections
+            # This will trigger the signals to load settings and save preferences in the correct order
+            
+            # Set the saved model if found - do this first to avoid unnecessary updates
+            if found_saved_model:
+                self.model_combo.setCurrentIndex(saved_model_index)
+                
+            # Set the saved voice if found - this will trigger loading voice-specific settings
+            if found_saved_voice:
+                self.voice_combo.setCurrentIndex(saved_voice_index)
+            else:
+                # If no saved voice was found, manually load default settings
+                self.load_voice_specific_settings()
             
         except Exception as e:
             # Ensure signals are reconnected even if there's an error
             try:
+                self.voice_combo.currentIndexChanged.connect(self.load_voice_specific_settings)
                 self.voice_combo.currentIndexChanged.connect(self.auto_save_preferences)
                 self.model_combo.currentIndexChanged.connect(self.auto_save_preferences)
                 self.format_combo.currentIndexChanged.connect(self.auto_save_preferences)
@@ -1507,6 +1574,132 @@ class ElevenLabsBatchConverter(QMainWindow):
         
         # Otherwise, keep the start of the name, add ellipsis, and keep the extension
         return name[:chars_to_keep] + "..." + ext
+
+    def load_voice_settings(self):
+        """Load all saved voice-specific settings from keyring."""
+        try:
+            # Get saved voice settings from keyring
+            settings_json = keyring.get_password(APP_NAME, VOICE_SETTINGS_KEY)
+            if settings_json:
+                self.voice_settings = json.loads(settings_json)
+            else:
+                self.voice_settings = {}
+                
+            logger.info(f"Loaded settings for {len(self.voice_settings)} voices")
+        except Exception as e:
+            logger.error(f"Error loading voice settings: {str(e)}")
+            self.voice_settings = {}
+
+    def save_voice_settings(self):
+        """Save all voice-specific settings to keyring."""
+        try:
+            # Convert voice settings dictionary to JSON and save
+            settings_json = json.dumps(self.voice_settings)
+            keyring.set_password(APP_NAME, VOICE_SETTINGS_KEY, settings_json)
+            logger.info(f"Saved settings for {len(self.voice_settings)} voices")
+        except Exception as e:
+            logger.error(f"Error saving voice settings: {str(e)}")
+
+    def load_voice_specific_settings(self):
+        """Load settings specific to the currently selected voice."""
+        voice_id = self.voice_combo.currentData()
+        if not voice_id:
+            return
+            
+        try:
+            # Temporarily disconnect signals to prevent loops
+            try:
+                self.stability_slider.valueChanged.disconnect(self.auto_save_preferences)
+            except TypeError:
+                pass
+                
+            try:
+                self.similarity_slider.valueChanged.disconnect(self.auto_save_preferences)
+            except TypeError:
+                pass
+                
+            try:
+                self.style_slider.valueChanged.disconnect(self.auto_save_preferences)
+            except TypeError:
+                pass
+                
+            try:
+                self.speaker_boost_checkbox.stateChanged.disconnect(self.auto_save_preferences)
+            except TypeError:
+                pass
+                
+            try:
+                self.remove_noise_checkbox.stateChanged.disconnect(self.auto_save_preferences)
+            except TypeError:
+                pass
+            
+            # Check if we have saved settings for this voice
+            if voice_id in self.voice_settings:
+                # Load saved settings for this voice
+                settings = self.voice_settings[voice_id]
+                
+                # Apply voice model settings
+                if 'stability' in settings:
+                    value = int(float(settings['stability']) * 100)
+                    self.stability_slider.setValue(value)
+                    self.update_stability_label(value)
+                    
+                if 'similarity_boost' in settings:
+                    value = int(float(settings['similarity_boost']) * 100)
+                    self.similarity_slider.setValue(value)
+                    self.update_similarity_label(value)
+                    
+                if 'style' in settings:
+                    value = int(float(settings['style']) * 100)
+                    self.style_slider.setValue(value)
+                    self.update_style_label(value)
+                    
+                # Apply checkbox settings
+                if 'speaker_boost' in settings:
+                    self.speaker_boost_checkbox.setChecked(settings['speaker_boost'])
+                    
+                if 'remove_silence' in settings:
+                    self.remove_noise_checkbox.setChecked(settings['remove_silence'])
+                
+                logger.info(f"Loaded settings for voice {voice_id}")
+            else:
+                # Apply default settings for this voice
+                # These match the initial values set in init_ui
+                self.stability_slider.setValue(50)  # 0.5
+                self.update_stability_label(50)
+                
+                self.similarity_slider.setValue(75)  # 0.75
+                self.update_similarity_label(75)
+                
+                self.style_slider.setValue(0)  # 0.0
+                self.update_style_label(0)
+                
+                self.speaker_boost_checkbox.setChecked(True)
+                self.remove_noise_checkbox.setChecked(False)
+                
+                logger.info(f"Applied default settings for new voice {voice_id}")
+                
+                # Save these default settings for the voice
+                self.save_preferences()
+            
+            # Reconnect signals
+            self.stability_slider.valueChanged.connect(self.auto_save_preferences)
+            self.similarity_slider.valueChanged.connect(self.auto_save_preferences)
+            self.style_slider.valueChanged.connect(self.auto_save_preferences)
+            self.speaker_boost_checkbox.stateChanged.connect(self.auto_save_preferences)
+            self.remove_noise_checkbox.stateChanged.connect(self.auto_save_preferences)
+            
+        except Exception as e:
+            # Make sure signals are reconnected if there's an error
+            try:
+                self.stability_slider.valueChanged.connect(self.auto_save_preferences)
+                self.similarity_slider.valueChanged.connect(self.auto_save_preferences)
+                self.style_slider.valueChanged.connect(self.auto_save_preferences)
+                self.speaker_boost_checkbox.stateChanged.connect(self.auto_save_preferences)
+                self.remove_noise_checkbox.stateChanged.connect(self.auto_save_preferences)
+            except:
+                pass
+            logger.error(f"Error loading voice settings: {str(e)}")
 
 def create_logo_file():
     """Create a logo file for the application if it doesn't exist."""
