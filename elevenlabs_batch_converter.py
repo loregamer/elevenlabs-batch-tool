@@ -525,6 +525,8 @@ class ConversionWorker(QThread):
                     bit_depth = 16
                     if "24" in self.output_format:
                         bit_depth = 24
+                    elif "32" in self.output_format:
+                        bit_depth = 32
                     format_info = f"{bit_depth}bit"
                 elif self.output_format.startswith("pcm"):
                     output_ext = ".wav"
@@ -910,6 +912,7 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.format_combo.addItem("MP3 (44.1kHz, 256kbps)", "mp3_44100_256")
         self.format_combo.addItem("FLAC (16-bit, 44.1kHz)", "flac_16")
         self.format_combo.addItem("FLAC (24-bit, 44.1kHz)", "flac_24")
+        self.format_combo.addItem("FLAC (32-bit, 44.1kHz)", "flac_32")
         self.format_combo.addItem("WAV (16-bit, 44.1kHz)", "pcm_16000")
         self.format_combo.addItem("WAV (24-bit, 44.1kHz)", "pcm_24000")
         self.format_combo.addItem("WAV (32-bit, 44.1kHz - Wwise Compatible)", "pcm_32000")
@@ -918,7 +921,8 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.format_combo.currentIndexChanged.connect(self.auto_save_preferences)
         self.format_combo.setToolTip("Select the output audio format and quality.\n"
                                     "MP3: Smaller file size, good for most uses.\n"
-                                    "WAV: Lossless quality, larger file size.\n"
+                                    "FLAC: Lossless compression, excellent quality with smaller file size than WAV.\n"
+                                    "WAV: Uncompressed lossless quality, larger file size.\n"
                                     "32-bit WAV is recommended for Wwise compatibility.")
         voice_layout.addWidget(self.format_combo)
         
