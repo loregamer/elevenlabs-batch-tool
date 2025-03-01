@@ -454,7 +454,7 @@ class ConversionWorker(QThread):
     conversion_finished = pyqtSignal()  # All conversions complete
     
     def __init__(self, api, voice_id, file_list, model_id, speaker_boost, remove_background_noise, 
-                 stability, similarity_boost, style):
+                 stability, similarity_boost, style, output_format="mp3_44100_128"):
         super().__init__()
         self.api = api
         self.voice_id = voice_id
@@ -465,6 +465,7 @@ class ConversionWorker(QThread):
         self.stability = stability
         self.similarity_boost = similarity_boost
         self.style = style
+        self.output_format = output_format
         self.is_cancelled = False
     
     def run(self):
@@ -485,7 +486,22 @@ class ConversionWorker(QThread):
                 
                 # Get the filename and create the output path
                 file_name = os.path.basename(file_path)
-                output_path = output_dir / f"{file_name}"
+                base_name, _ = os.path.splitext(file_name)
+                
+                # Determine the output file extension based on the format
+                if self.output_format.startswith("mp3"):
+                    output_ext = ".mp3"
+                    format_info = self.output_format.split("_")[-1] + "kbps"  # Extract bitrate
+                elif self.output_format.startswith("pcm"):
+                    output_ext = ".wav"
+                    bit_depth = "16bit" if "16000" in self.output_format else "24bit"
+                    format_info = bit_depth
+                else:
+                    # Default to mp3 if format is unknown
+                    output_ext = ".mp3"
+                    format_info = "128kbps"
+                
+                output_path = output_dir / f"{base_name}_{format_info}{output_ext}"
                 
                 # Convert the file
                 audio_data, token_info = self.api.convert_speech_to_speech(
@@ -496,7 +512,8 @@ class ConversionWorker(QThread):
                     remove_background_noise=self.remove_background_noise,
                     stability=self.stability,
                     similarity_boost=self.similarity_boost,
-                    style=self.style
+                    style=self.style,
+                    output_format=self.output_format
                 )
                 
                 if audio_data:
@@ -818,6 +835,21 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.model_combo = QComboBox()
         voice_layout.addWidget(self.model_combo)
         
+        # Add output format selection
+        voice_layout.addWidget(QLabel("Output Format:"))
+        self.format_combo = QComboBox()
+        # Add common audio formats
+        self.format_combo.addItem("MP3 (44.1kHz, 128kbps)", "mp3_44100_128")
+        self.format_combo.addItem("MP3 (44.1kHz, 192kbps)", "mp3_44100_192")
+        self.format_combo.addItem("MP3 (44.1kHz, 256kbps)", "mp3_44100_256")
+        self.format_combo.addItem("WAV (16-bit, 44.1kHz)", "pcm_16000")
+        self.format_combo.addItem("WAV (24-bit, 44.1kHz)", "pcm_24000")
+        self.format_combo.setCurrentIndex(0)  # Default to MP3 128kbps
+        self.format_combo.setToolTip("Select the output audio format and quality.\n"
+                                    "MP3: Smaller file size, good for most uses.\n"
+                                    "WAV: Lossless quality, larger file size.")
+        voice_layout.addWidget(self.format_combo)
+        
         # Add voice model settings group
         settings_group = QGroupBox("Voice Model Settings")
         settings_layout = QFormLayout(settings_group)
@@ -1136,6 +1168,9 @@ class ElevenLabsBatchConverter(QMainWindow):
         similarity_boost = self.similarity_slider.value() / 100.0
         style = self.style_slider.value() / 100.0
         
+        # Get the selected output format
+        output_format = self.format_combo.currentData()
+        
         # Get all file paths from the list
         file_paths = [self.file_list.item(i).data(Qt.ItemDataRole.UserRole) 
                       for i in range(self.file_list.count())]
@@ -1152,6 +1187,7 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.clear_files_btn.setEnabled(False)
         self.voice_combo.setEnabled(False)
         self.model_combo.setEnabled(False)
+        self.format_combo.setEnabled(False)
         self.speaker_boost_checkbox.setEnabled(False)
         self.remove_noise_checkbox.setEnabled(False)
         self.stability_slider.setEnabled(False)
@@ -1170,7 +1206,8 @@ class ElevenLabsBatchConverter(QMainWindow):
             remove_background_noise,
             stability,
             similarity_boost,
-            style
+            style,
+            output_format
         )
         self.worker.progress_updated.connect(self.update_progress)
         self.worker.conversion_complete.connect(self.add_conversion_result)
@@ -1237,6 +1274,7 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.clear_files_btn.setEnabled(True)
         self.voice_combo.setEnabled(True)
         self.model_combo.setEnabled(True)
+        self.format_combo.setEnabled(True)
         self.speaker_boost_checkbox.setEnabled(True)
         self.remove_noise_checkbox.setEnabled(True)
         self.stability_slider.setEnabled(True)
