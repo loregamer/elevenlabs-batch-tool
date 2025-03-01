@@ -179,7 +179,7 @@ class AudioFileWidget(QWidget):
             }
             QPushButton {
                 background-color: #2c3e50;
-                border-radius: 18px;  /* Adjusted for larger button */
+                border-radius: 18px;
             }
             QPushButton:hover {
                 background-color: #34495e;
@@ -196,17 +196,13 @@ class AudioFileWidget(QWidget):
     def get_audio_duration(self):
         """Get the duration of the audio file in seconds."""
         try:
-            # Try using mutagen for common audio formats
             if self.file_path.lower().endswith('.wav'):
                 audio = WAVE(self.file_path)
                 return audio.info.length
             else:
-                # For other formats
                 audio = mutagen.File(self.file_path)
                 if audio is not None:
                     return audio.info.length
-            
-            # Fallback: estimate based on file size (very rough)
             return 0
         except Exception as e:
             logging.error(f"Error getting audio duration: {str(e)}")
@@ -216,7 +212,6 @@ class AudioFileWidget(QWidget):
         """Format seconds into a readable time string."""
         minutes, seconds = divmod(int(seconds), 60)
         hours, minutes = divmod(minutes, 60)
-        
         if hours > 0:
             return f"{hours}:{minutes:02d}:{seconds:02d}"
         else:
@@ -231,22 +226,17 @@ class AudioFileWidget(QWidget):
     
     def play(self):
         """Play the audio file."""
-        # Stop all other audio files
         parent_list = self.parent()
         while parent_list and not isinstance(parent_list, QListWidget):
             parent_list = parent_list.parent()
-        
         if parent_list:
-            # Stop all other audio widgets
             for i in range(parent_list.count()):
                 item = parent_list.item(i)
                 widget = parent_list.itemWidget(item)
                 if widget and isinstance(widget, AudioFileWidget) and widget != self:
                     widget.stop()
-        
         if self.player.source() != QUrl.fromLocalFile(self.file_path):
             self.player.setSource(QUrl.fromLocalFile(self.file_path))
-        
         self.player.play()
     
     def pause(self):
@@ -258,88 +248,60 @@ class AudioFileWidget(QWidget):
         self.player.stop()
     
     def handle_source_changed(self, source):
-        """Handle when the media source changes."""
         pass
     
     def handle_state_changed(self, state):
-        """Handle when the playback state changes."""
         if state == QMediaPlayer.PlaybackState.PlayingState:
             self.is_playing = True
             self.play_button.setIcon(qta.icon('fa5s.pause', color='white'))
-            # Show progress bar and position label during playback
             self.progress_bar.setVisible(True)
             self.position_label.setVisible(True)
         else:
             self.is_playing = False
             self.play_button.setIcon(qta.icon('fa5s.play', color='white'))
-            # Hide progress bar when not playing
             if state == QMediaPlayer.PlaybackState.StoppedState:
                 self.progress_bar.setVisible(False)
                 self.position_label.setVisible(False)
                 self.progress_bar.setValue(0)
                 
     def handle_error(self, error, error_string):
-        """Handle media player errors."""
         logging.error(f"Media player error: {error_string}")
-        QMessageBox.warning(self, "Playback Error", 
-                          f"Error playing audio file: {error_string}")
-
+        QMessageBox.warning(self, "Playback Error", f"Error playing audio file: {error_string}")
+    
     def update_position(self, position):
-        """Update the position indicator."""
         if self.player.duration() > 0:
             progress = int((position / self.player.duration()) * 100)
             self.progress_bar.setValue(progress)
-            
-            # Update position label
-            position_str = self.format_duration(position / 1000)  # Convert ms to seconds
+            position_str = self.format_duration(position / 1000)
             duration_str = self.format_duration(self.player.duration() / 1000)
             self.position_label.setText(f"{position_str} / {duration_str}")
-
+    
     def update_duration(self, duration):
-        """Update the duration display when media is loaded."""
         if duration > 0:
-            self.duration = duration / 1000  # Convert ms to seconds
+            self.duration = duration / 1000
             duration_str = self.format_duration(self.duration)
             self.duration_label.setText(f"Duration: {duration_str}")
-            
-            # Reset position display
             self.position_label.setText(f"0:00 / {duration_str}")
             self.progress_bar.setValue(0)
-
+    
     def seek_to_position(self, percent):
-        """Seek to a position in the audio file."""
         if self.player.duration() > 0:
-            # Calculate the position in milliseconds
             position = int((percent / 100.0) * self.player.duration())
             self.player.setPosition(position)
-            
-            # If not playing, start playback
             if not self.is_playing:
                 self.play()
-
+    
     def set_index(self, index):
-        """Update the index number."""
         self.index = index
         self.index_label.setText(f"{index+1}.")
-
+    
     def ellipsify_filename(self, filename, max_length=40):
-        """Ellipsify a filename while preserving the extension."""
         if len(filename) <= max_length:
             return filename
-        
-        # Split the filename into name and extension
         name, ext = os.path.splitext(filename)
-        
-        # Calculate how many characters we can keep from the name
-        # We need to account for the ellipsis "..." (3 chars) and the extension
         chars_to_keep = max_length - 3 - len(ext)
-        
-        # If we can't even fit a single character plus ellipsis plus extension,
-        # just truncate the whole thing
         if chars_to_keep < 1:
             return filename[:max_length-3] + "..."
-        
-        # Otherwise, keep the start of the name, add ellipsis, and keep the extension
         return name[:chars_to_keep] + "..." + ext
 
 class DragDropListWidget(QListWidget):
@@ -357,19 +319,13 @@ class DragDropListWidget(QListWidget):
         """)
         self._default_stylesheet = self.styleSheet()
         self._drag_active = False
-        
-        # Set item delegate properties for custom widgets
         self.setItemDelegate(QStyledItemDelegate())
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
-        
-        # Set spacing between items
         self.setSpacing(2)
         
     def dragEnterEvent(self, event: QDragEnterEvent):
-        """Handle drag enter events for files."""
         if event.mimeData().hasUrls():
-            # Check if at least one file has an accepted extension
             for url in event.mimeData().urls():
                 if self._is_accepted_file(url):
                     self._set_drag_active(True)
@@ -377,32 +333,23 @@ class DragDropListWidget(QListWidget):
                     return
     
     def dragLeaveEvent(self, event):
-        """Handle drag leave events."""
         self._set_drag_active(False)
         
     def dragMoveEvent(self, event):
-        """Handle drag move events."""
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
             
     def dropEvent(self, event: QDropEvent):
-        """Handle drop events for files."""
         self._set_drag_active(False)
-        
         if event.mimeData().hasUrls():
             event.setDropAction(Qt.DropAction.CopyAction)
             event.accept()
-            
-            # Process the dropped files
             for url in event.mimeData().urls():
                 if self._is_accepted_file(url):
                     self._add_file(url.toLocalFile())
-            
-            # Update indices after adding files
             self.update_indices()
     
     def _set_drag_active(self, active):
-        """Set the drag active state and update the visual style."""
         if self._drag_active != active:
             self._drag_active = active
             if active:
@@ -416,39 +363,23 @@ class DragDropListWidget(QListWidget):
                 self.setStyleSheet(self._default_stylesheet)
     
     def _is_accepted_file(self, url: QUrl) -> bool:
-        """Check if the file has an accepted extension."""
         if not url.isLocalFile():
             return False
-            
         file_path = url.toLocalFile()
         file_ext = os.path.splitext(file_path)[1].lower()
         return file_ext in self.accepted_extensions
     
     def _add_file(self, file_path: str):
-        """Add a file to the list if it's not already there."""
-        # Check if the file is already in the list
-        existing_items = [self.item(i).data(Qt.ItemDataRole.UserRole) 
-                         for i in range(self.count())]
-        
+        existing_items = [self.item(i).data(Qt.ItemDataRole.UserRole) for i in range(self.count())]
         if file_path not in existing_items:
-            # Create a custom widget for the audio file with the correct index
             audio_widget = AudioFileWidget(file_path, index=self.count())
-            
-            # Create a list item to hold the widget
             item = QListWidgetItem(self)
             item.setData(Qt.ItemDataRole.UserRole, file_path)
-            
-            # Set the size of the item to match the widget
             item.setSizeHint(audio_widget.sizeHint())
-            
-            # Add the item to the list
             self.addItem(item)
-            
-            # Set the widget for the item
             self.setItemWidget(item, audio_widget)
-
+    
     def update_indices(self):
-        """Update the indices of all audio file widgets."""
         for i in range(self.count()):
             widget = self.itemWidget(self.item(i))
             if widget and isinstance(widget, AudioFileWidget):
@@ -456,9 +387,9 @@ class DragDropListWidget(QListWidget):
 
 class ConversionWorker(QThread):
     """Worker thread to handle audio conversion without blocking the UI."""
-    progress_updated = pyqtSignal(int, int)  # (current, total)
-    conversion_complete = pyqtSignal(str, bool, dict)  # (file_path, success, token_info)
-    conversion_finished = pyqtSignal()  # All conversions complete
+    progress_updated = pyqtSignal(int, int)
+    conversion_complete = pyqtSignal(str, bool, dict)
+    conversion_finished = pyqtSignal()
     
     def __init__(self, api, voice_id, file_list, model_id, speaker_boost, remove_background_noise, 
                  stability, similarity_boost, style, output_format="mp3_44100_128"):
@@ -476,19 +407,13 @@ class ConversionWorker(QThread):
         self.is_cancelled = False
     
     def _fix_wav_format(self, file_path, bit_depth=32):
-        """Convert to proper WAV format for Wwise compatibility"""
         try:
-            # Use pydub to load and convert the audio
             audio = AudioSegment.from_file(file_path)
-            
-            # Set sample width based on bit depth (1 = 8bit, 2 = 16bit, 3 = 24bit, 4 = 32bit)
-            sample_width = 4  # Default to 32-bit for Wwise
+            sample_width = 4
             if bit_depth == 16:
                 sample_width = 2
             elif bit_depth == 24:
                 sample_width = 3
-                
-            # Export with proper WAV headers
             audio = audio.set_sample_width(sample_width)
             audio.export(file_path, format="wav")
             logger.info(f"Successfully fixed WAV format for {file_path}")
@@ -498,29 +423,19 @@ class ConversionWorker(QThread):
             return False
     
     def run(self):
-        """Execute the conversion process for each file."""
         total_files = len(self.file_list)
-        
-        # Create output directory if it doesn't exist
         output_dir = Path("output")
         output_dir.mkdir(exist_ok=True)
-        
         for i, file_path in enumerate(self.file_list):
             if self.is_cancelled:
                 break
-                
             try:
-                # Update progress
                 self.progress_updated.emit(i, total_files)
-                
-                # Get the filename and create the output path
                 file_name = os.path.basename(file_path)
                 base_name, _ = os.path.splitext(file_name)
-                
-                # Determine the output file extension based on the format
                 if self.output_format.startswith("mp3"):
                     output_ext = ".mp3"
-                    bit_depth = None  # Only needed for WAV format
+                    bit_depth = None
                 elif self.output_format.startswith("flac"):
                     output_ext = ".flac"
                     bit_depth = 16
@@ -530,7 +445,6 @@ class ConversionWorker(QThread):
                         bit_depth = 32
                 elif self.output_format.startswith("pcm"):
                     output_ext = ".wav"
-                    # Extract the bit depth from the format string
                     if "16000" in self.output_format:
                         bit_depth = 16
                     elif "24000" in self.output_format:
@@ -538,16 +452,11 @@ class ConversionWorker(QThread):
                     elif "32000" in self.output_format:
                         bit_depth = 32
                     else:
-                        bit_depth = 32  # Use 32-bit as a safe default for compatibility
+                        bit_depth = 32
                 else:
-                    # Default to mp3 if format is unknown
                     output_ext = ".mp3"
                     bit_depth = None
-                
-                # Use the original filename with the new extension
                 output_path = output_dir / f"{base_name}{output_ext}"
-                
-                # Convert the file
                 audio_data, token_info = self.api.convert_speech_to_speech(
                     voice_id=self.voice_id,
                     audio_file_path=file_path,
@@ -559,96 +468,64 @@ class ConversionWorker(QThread):
                     style=self.style,
                     output_format=self.output_format
                 )
-                
                 if audio_data:
-                    # Save the converted audio
                     with open(output_path, "wb") as f:
                         f.write(audio_data)
-                    
-                    # Fix WAV files for Wwise compatibility
                     if output_ext.lower() == ".wav":
                         self._fix_wav_format(output_path, bit_depth)
                     elif output_ext.lower() == ".flac":
-                        # FLAC files don't need fixing, they're already lossless
                         logger.info(f"FLAC format selected for {output_path}")
-                    
                     self.conversion_complete.emit(str(output_path), True, token_info or {})
                 else:
                     self.conversion_complete.emit(file_path, False, {})
-            
             except Exception as e:
                 logger.error(f"Error converting {file_path}: {str(e)}")
                 self.conversion_complete.emit(file_path, False, {})
-        
         self.progress_updated.emit(total_files, total_files)
         self.conversion_finished.emit()
     
     def cancel(self):
-        """Cancel the conversion process."""
         self.is_cancelled = True
 
 class SplashScreen(QSplashScreen):
     """Custom splash screen with loading animation."""
     
     def __init__(self):
-        # Create a pixmap for the splash screen
         splash_pixmap = QPixmap(400, 300)
-        splash_pixmap.fill(QColor("#2c3e50"))  # Dark blue background to match app theme
-        
+        splash_pixmap.fill(QColor("#2c3e50"))
         super().__init__(splash_pixmap)
-        
-        # Create a container widget for the content
         self.container = QWidget()
         self.container.setFixedSize(400, 300)
-        
-        # Set up the layout for the splash screen
         self.layout = QVBoxLayout(self.container)
         self.layout.setContentsMargins(20, 20, 20, 20)
         self.layout.setSpacing(10)
         self.layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
-        # Add logo/image
         try:
-            # Try to load the logo image if it exists
             logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "resources", "logo.png")
             if os.path.exists(logo_path):
                 logo_label = QLabel()
                 logo_pixmap = QPixmap(logo_path)
-                # Limit the logo size to ensure there's room for loading text and progress bar
                 scaled_pixmap = logo_pixmap.scaled(180, 140, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
                 logo_label.setPixmap(scaled_pixmap)
                 logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.layout.addWidget(logo_label)
             else:
-                # If no logo file, create a simple logo using qtawesome
                 icon_label = QLabel()
-                # Create a pixmap for the icon
                 icon_pixmap = QPixmap(128, 128)
                 icon_pixmap.fill(Qt.GlobalColor.transparent)
-                
-                # Create a microphone icon
                 mic_icon = qta.icon('fa5s.microphone-alt', color='#3498db')
                 mic_pixmap = mic_icon.pixmap(80, 80)
-                
-                # Create a sound wave icon
                 wave_icon = qta.icon('fa5s.wave-square', color='#2ecc71')
                 wave_pixmap = wave_icon.pixmap(60, 60)
-                
-                # Paint both icons onto the pixmap
                 painter = QPainter(icon_pixmap)
-                painter.drawPixmap(24, 10, mic_pixmap)  # Position the microphone
-                painter.drawPixmap(34, 70, wave_pixmap)  # Position the wave below
+                painter.drawPixmap(24, 10, mic_pixmap)
+                painter.drawPixmap(34, 70, wave_pixmap)
                 painter.end()
-                
                 icon_label.setPixmap(icon_pixmap)
                 icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.layout.addWidget(icon_label)
         except Exception as e:
             logger.error(f"Error loading splash screen image: {str(e)}")
-            # Fallback - just show text
-            pass
-        
-        # Add title
         title_label = QLabel("ElevenLabs Batch Voice Changer")
         title_font = QFont()
         title_font.setPointSize(16)
@@ -657,23 +534,17 @@ class SplashScreen(QSplashScreen):
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_label.setStyleSheet("color: white;")
         self.layout.addWidget(title_label)
-        
-        # Add version
         version_label = QLabel(f"Version {APP_VERSION}")
         version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        version_label.setStyleSheet("color: #bdc3c7;")  # Light gray color
+        version_label.setStyleSheet("color: #bdc3c7;")
         self.layout.addWidget(version_label)
-        
-        # Add loading text
         self.loading_label = QLabel("Loading...")
         self.loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.loading_label.setStyleSheet("color: white;")
         self.layout.addWidget(self.loading_label)
-        
-        # Add progress bar
         self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 100)  # Determinate progress (0-100%)
-        self.progress_bar.setValue(0)  # Start at 0%
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
         self.progress_bar.setTextVisible(False)
         self.progress_bar.setStyleSheet("""
             QProgressBar {
@@ -688,42 +559,29 @@ class SplashScreen(QSplashScreen):
             }
         """)
         self.layout.addWidget(self.progress_bar)
-        
-        # Set up animation dots for loading text
         self.dot_count = 0
         self.dot_timer = QTimer()
         self.dot_timer.timeout.connect(self.update_loading_text)
-        self.dot_timer.start(500)  # Update every 500ms
-        
-        # Track the current step for progress bar
+        self.dot_timer.start(500)
         self.current_step = 0
-        self.total_steps = 6  # Total number of steps in the splash sequence
+        self.total_steps = 6
     
     def update_loading_text(self):
-        """Update the loading text with animated dots."""
         self.dot_count = (self.dot_count + 1) % 4
         dots = "." * self.dot_count
         self.loading_label.setText(f"Loading{dots}")
-        self.repaint()  # Force the splash screen to redraw immediately
+        self.repaint()
     
     def drawContents(self, painter):
-        """Draw the contents of the splash screen."""
-        # Render the container widget onto the splash screen
         self.container.render(painter)
         
     def showMessage(self, message, alignment=Qt.AlignmentFlag.AlignLeft, color=Qt.GlobalColor.white):
-        """Override to update our custom loading label instead of using the default message display."""
-        # Update the loading text
         self.loading_label.setText(message)
-        
-        # Update the progress bar
         self.current_step += 1
         progress = min(int((self.current_step / self.total_steps) * 100), 100)
         self.progress_bar.setValue(progress)
-        
-        # Force immediate repaint
         self.repaint()
-        QApplication.processEvents()  # Make sure the UI updates
+        QApplication.processEvents()
 
 class ElevenLabsBatchConverter(QMainWindow):
     """Main application window for the ElevenLabs Batch Converter."""
@@ -733,62 +591,24 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.api = None
         self.worker = None
         self.voices = []
-        
-        # Try to get API key from keyring
         self.api_key = keyring.get_password(APP_NAME, KEY_NAME) or ""
-        
-        # Try to get saved preferences
         self.saved_voice_id = keyring.get_password(APP_NAME, VOICE_KEY) or ""
         self.saved_model_id = keyring.get_password(APP_NAME, MODEL_KEY) or ""
         self.saved_output_format = keyring.get_password(APP_NAME, FORMAT_KEY) or ""
-        
-        # Load voice-specific settings
         self.voice_settings = {}
         self.load_voice_settings()
-        
-        # Enable drag and drop for the main window
         self.setAcceptDrops(True)
-        
         self.init_ui()
         
     def init_ui(self):
-        """Set up the user interface."""
         self.setWindowTitle(f"ElevenLabs Batch Voice Changer v{APP_VERSION}")
-        self.setMinimumSize(800, 600)
+        self.setMinimumSize(800, 800)
         
-        # Main widget and layout
         main_widget = QWidget()
         main_layout = QVBoxLayout(main_widget)
+        # Set stretch factors: API settings and title remain fixed,
+        # the splitter gets all extra vertical space.
         self.setCentralWidget(main_widget)
-        
-        # Set application style
-        self.setStyleSheet("""
-            QPushButton {
-                padding: 5px;
-                border-radius: 4px;
-                background-color: #2c3e50;
-                color: white;
-            }
-            QPushButton:hover {
-                background-color: #34495e;
-            }
-            QPushButton:disabled {
-                background-color: #7f8c8d;
-                color: #bdc3c7;
-            }
-            QGroupBox {
-                font-weight: bold;
-                border: 1px solid #bdc3c7;
-                border-radius: 5px;
-                margin-top: 1ex;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                subcontrol-position: top center;
-                padding: 0 5px;
-            }
-        """)
         
         # Title
         title_label = QLabel("ElevenLabs Batch Voice Changer")
@@ -797,113 +617,81 @@ class ElevenLabsBatchConverter(QMainWindow):
         title_font.setBold(True)
         title_label.setFont(title_font)
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(title_label)
+        main_layout.addWidget(title_label, 0)
         
         # API Key settings
         api_key_group = QGroupBox("API Settings")
         api_key_layout = QFormLayout(api_key_group)
-        
         self.api_key_input = QLineEdit(self.api_key)
         self.api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.api_key_input.setPlaceholderText("Enter your ElevenLabs API key here")
         api_key_layout.addRow("API Key:", self.api_key_input)
-        
-        # Toggle visibility button for API key
         api_key_buttons = QHBoxLayout()
-        
         self.toggle_visibility_btn = QPushButton("Show/Hide Key")
         self.toggle_visibility_btn = self.style_button(self.toggle_visibility_btn, 'fa5s.eye', "Show/Hide Key")
         self.toggle_visibility_btn.clicked.connect(self.toggle_api_key_visibility)
         api_key_buttons.addWidget(self.toggle_visibility_btn)
-        
         self.connect_api_btn = QPushButton("Connect")
         self.connect_api_btn = self.style_button(self.connect_api_btn, 'fa5s.plug', "Connect")
         self.connect_api_btn.clicked.connect(self.connect_api)
         api_key_buttons.addWidget(self.connect_api_btn)
-        
         self.save_key_btn = QPushButton("Save Key")
         self.save_key_btn = self.style_button(self.save_key_btn, 'fa5s.save', "Save Key")
         self.save_key_btn.clicked.connect(self.save_api_key)
         api_key_buttons.addWidget(self.save_key_btn)
-        
         api_key_layout.addRow("", api_key_buttons)
-        
-        # Add credits display
         self.credits_label = QLabel("Credits: Not connected")
         credits_font = QFont()
         credits_font.setBold(True)
         self.credits_label.setFont(credits_font)
         api_key_layout.addRow("", self.credits_label)
+        main_layout.addWidget(api_key_group, 0)
         
-        main_layout.addWidget(api_key_group)
-        
-        # Create a splitter to divide left and right panels
+        # Splitter for Audio Files and Voice Selection
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        main_layout.addWidget(splitter)
-        
         # Left panel - File selection
         left_panel = QFrame()
         left_layout = QVBoxLayout(left_panel)
-        
         file_group = QGroupBox("Audio Files")
         file_layout = QVBoxLayout(file_group)
-        
-        # File list
         self.file_list = DragDropListWidget(self)
         file_layout.addWidget(self.file_list)
-        
-        # Add a label to indicate drag and drop functionality
         drag_drop_label = QLabel("Drag and drop audio files here")
         drag_drop_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         drag_drop_label.setStyleSheet("color: #7f8c8d; font-style: italic;")
         file_layout.addWidget(drag_drop_label)
-        
-        # File buttons
         file_buttons = QHBoxLayout()
         self.add_files_btn = QPushButton("Add Files")
         self.add_files_btn = self.style_button(self.add_files_btn, 'fa5s.file-audio', "Add Files")
         self.add_files_btn.clicked.connect(self.add_files)
         file_buttons.addWidget(self.add_files_btn)
-        
         self.remove_file_btn = QPushButton("Remove Selected")
         self.remove_file_btn = self.style_button(self.remove_file_btn, 'fa5s.trash-alt', "Remove Selected")
         self.remove_file_btn.clicked.connect(self.remove_selected_file)
         file_buttons.addWidget(self.remove_file_btn)
-        
         self.clear_files_btn = QPushButton("Clear All")
         self.clear_files_btn = self.style_button(self.clear_files_btn, 'fa5s.times-circle', "Clear All")
         self.clear_files_btn.clicked.connect(self.clear_files)
         file_buttons.addWidget(self.clear_files_btn)
-        
         file_layout.addLayout(file_buttons)
         left_layout.addWidget(file_group)
         
         # Right panel - Voice selection and conversion
         right_panel = QFrame()
         right_layout = QVBoxLayout(right_panel)
-        
-        # Voice selection
         voice_group = QGroupBox("Voice Selection")
         voice_layout = QVBoxLayout(voice_group)
-        
         voice_layout.addWidget(QLabel("Select Voice:"))
         self.voice_combo = QComboBox()
-        # Connect voice combo change to load voice-specific settings FIRST, THEN auto_save_preferences
         self.voice_combo.currentIndexChanged.connect(self.load_voice_specific_settings)
         self.voice_combo.currentIndexChanged.connect(self.auto_save_preferences)
         voice_layout.addWidget(self.voice_combo)
-        
-        # Add model selection
         voice_layout.addWidget(QLabel("Select Model:"))
         self.model_combo = QComboBox()
-        # Connect the combobox change signal to save preferences automatically
         self.model_combo.currentIndexChanged.connect(self.auto_save_preferences)
         voice_layout.addWidget(self.model_combo)
-        
-        # Add output format selection
         voice_layout.addWidget(QLabel("Output Format:"))
         self.format_combo = QComboBox()
-        # Add common audio formats
         self.format_combo.addItem("MP3 (44.1kHz, 128kbps)", "mp3_44100_128")
         self.format_combo.addItem("MP3 (44.1kHz, 192kbps)", "mp3_44100_192")
         self.format_combo.addItem("MP3 (44.1kHz, 256kbps)", "mp3_44100_256")
@@ -913,135 +701,100 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.format_combo.addItem("WAV (16-bit, 44.1kHz)", "pcm_16000")
         self.format_combo.addItem("WAV (24-bit, 44.1kHz)", "pcm_24000")
         self.format_combo.addItem("WAV (32-bit, 44.1kHz - Wwise Compatible)", "pcm_32000")
-        self.format_combo.setCurrentIndex(0)  # Default to MP3 128kbps
-        # Connect the combobox change signal to save preferences automatically
+        self.format_combo.setCurrentIndex(0)
         self.format_combo.currentIndexChanged.connect(self.auto_save_preferences)
         self.format_combo.setToolTip("Select the output audio format and quality.\n"
-                                    "MP3: Smaller file size, good for most uses.\n"
-                                    "FLAC: Lossless compression, excellent quality with smaller file size than WAV.\n"
-                                    "WAV: Uncompressed lossless quality, larger file size.\n"
-                                    "32-bit WAV is recommended for Wwise compatibility.")
+                                     "MP3: Smaller file size, good for most uses.\n"
+                                     "FLAC: Lossless compression, excellent quality with smaller file size than WAV.\n"
+                                     "WAV: Uncompressed lossless quality, larger file size.\n"
+                                     "32-bit WAV is recommended for Wwise compatibility.")
         voice_layout.addWidget(self.format_combo)
-        
-        # Add voice model settings group
         settings_group = QGroupBox("Voice Model Settings")
         settings_layout = QFormLayout(settings_group)
-        
-        # Stability slider (0.0 to 1.0)
         self.stability_label = QLabel("Stability: 0.5")
         self.stability_slider = QSlider(Qt.Orientation.Horizontal)
         self.stability_slider.setRange(0, 100)
-        self.stability_slider.setValue(50)  # Default 0.5
+        self.stability_slider.setValue(50)
         self.stability_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
         self.stability_slider.setTickInterval(10)
         self.stability_slider.valueChanged.connect(self.update_stability_label)
         self.stability_slider.valueChanged.connect(self.auto_save_preferences)
         settings_layout.addRow(self.stability_label, self.stability_slider)
-        
-        # Similarity Boost slider (0.0 to 1.0)
         self.similarity_label = QLabel("Similarity Boost: 0.75")
         self.similarity_slider = QSlider(Qt.Orientation.Horizontal)
         self.similarity_slider.setRange(0, 100)
-        self.similarity_slider.setValue(75)  # Default 0.75
+        self.similarity_slider.setValue(75)
         self.similarity_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
         self.similarity_slider.setTickInterval(10)
         self.similarity_slider.valueChanged.connect(self.update_similarity_label)
         self.similarity_slider.valueChanged.connect(self.auto_save_preferences)
         settings_layout.addRow(self.similarity_label, self.similarity_slider)
-        
-        # Style Exaggeration slider (0.0 to 1.0)
         self.style_label = QLabel("Style Exaggeration: 0.0")
         self.style_slider = QSlider(Qt.Orientation.Horizontal)
         self.style_slider.setRange(0, 100)
-        self.style_slider.setValue(0)  # Default 0.0
+        self.style_slider.setValue(0)
         self.style_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
         self.style_slider.setTickInterval(10)
         self.style_slider.valueChanged.connect(self.update_style_label)
         self.style_slider.valueChanged.connect(self.auto_save_preferences)
         settings_layout.addRow(self.style_label, self.style_slider)
-        
         voice_layout.addWidget(settings_group)
-        
-        # Add speaker boost option
         self.speaker_boost_checkbox = QCheckBox("Speaker Boost")
-        self.speaker_boost_checkbox.setChecked(True)  # Default to enabled
+        self.speaker_boost_checkbox.setChecked(True)
         self.speaker_boost_checkbox.setToolTip("Enhance the target speaker's voice")
         self.speaker_boost_checkbox.stateChanged.connect(self.auto_save_preferences)
         voice_layout.addWidget(self.speaker_boost_checkbox)
-        
-        # Add background noise removal option
         self.remove_noise_checkbox = QCheckBox("Remove Silence")
-        self.remove_noise_checkbox.setChecked(False)  # Default to disabled
+        self.remove_noise_checkbox.setChecked(False)
         self.remove_noise_checkbox.setToolTip("Remove silence and background noise from the audio")
         self.remove_noise_checkbox.stateChanged.connect(self.auto_save_preferences)
         voice_layout.addWidget(self.remove_noise_checkbox)
-        
         self.refresh_voices_btn = QPushButton("Refresh Voices")
         self.refresh_voices_btn = self.style_button(self.refresh_voices_btn, 'fa5s.sync', "Refresh Voices")
         self.refresh_voices_btn.clicked.connect(self.load_voices)
         voice_layout.addWidget(self.refresh_voices_btn)
-        
         right_layout.addWidget(voice_group)
-        
-        # Conversion controls
         conversion_group = QGroupBox("Conversion")
         conversion_layout = QVBoxLayout(conversion_group)
-        
-        # Progress bar
         conversion_layout.addWidget(QLabel("Progress:"))
         self.progress_bar = QProgressBar()
         conversion_layout.addWidget(self.progress_bar)
-        
-        # Status
         self.status_label = QLabel("Enter your API key and click Connect to start")
         conversion_layout.addWidget(self.status_label)
-        
-        # Conversion results
         conversion_layout.addWidget(QLabel("Conversion Results:"))
         self.results_list = QListWidget()
         conversion_layout.addWidget(self.results_list)
-        
-        # Control buttons
         control_buttons = QHBoxLayout()
-        
         self.start_btn = QPushButton("Start Conversion")
         self.start_btn = self.style_button(self.start_btn, 'fa5s.play', "Start Conversion", icon_color='#2ecc71')
         self.start_btn.clicked.connect(self.start_conversion)
-        self.start_btn.setEnabled(False)  # Disabled until API connected
+        self.start_btn.setEnabled(False)
         control_buttons.addWidget(self.start_btn)
-        
         self.cancel_btn = QPushButton("Cancel")
         self.cancel_btn = self.style_button(self.cancel_btn, 'fa5s.stop', "Cancel", icon_color='#e74c3c')
         self.cancel_btn.clicked.connect(self.cancel_conversion)
         self.cancel_btn.setEnabled(False)
         control_buttons.addWidget(self.cancel_btn)
-        
         conversion_layout.addLayout(control_buttons)
         right_layout.addWidget(conversion_group)
-        
-        # Wrap the right panel in a scroll area for better resizing support
         right_scroll = QScrollArea()
         right_scroll.setWidgetResizable(True)
         right_scroll.setWidget(right_panel)
         splitter.addWidget(left_panel)
         splitter.addWidget(right_scroll)
-        splitter.setSizes([400, 400])  # Equal initial sizes
-        
-        # Open output folder button
+        splitter.setSizes([400, 400])
+        main_layout.addWidget(splitter, 1)
         self.open_output_btn = QPushButton("Open Output Folder")
         self.open_output_btn = self.style_button(self.open_output_btn, 'fa5s.folder-open', "Open Output Folder")
         self.open_output_btn.clicked.connect(self.open_output_folder)
-        main_layout.addWidget(self.open_output_btn)
+        main_layout.addWidget(self.open_output_btn, 0)
         
-        # If we already have an API key from keyring, connect automatically
         if self.api_key:
             self.connect_api()
         
-        # Connect voice combo change to load voice-specific settings
         self.voice_combo.currentIndexChanged.connect(self.load_voice_specific_settings)
     
     def style_button(self, button, icon_name, tooltip="", icon_color='white'):
-        """Apply a consistent style to a button with an icon."""
         button.setIcon(qta.icon(icon_name, color=icon_color))
         button.setIconSize(QSize(16, 16))
         if tooltip:
@@ -1049,7 +802,6 @@ class ElevenLabsBatchConverter(QMainWindow):
         return button
     
     def toggle_api_key_visibility(self):
-        """Toggle between showing and hiding the API key."""
         if self.api_key_input.echoMode() == QLineEdit.EchoMode.Password:
             self.api_key_input.setEchoMode(QLineEdit.EchoMode.Normal)
             self.toggle_visibility_btn.setIcon(self.style_button(QPushButton(), 'fa5s.eye-slash').icon())
@@ -1058,24 +810,17 @@ class ElevenLabsBatchConverter(QMainWindow):
             self.toggle_visibility_btn.setIcon(self.style_button(QPushButton(), 'fa5s.eye').icon())
     
     def save_api_key(self):
-        """Save the current API key securely to the system keyring."""
         api_key = self.api_key_input.text().strip()
         if not api_key:
             QMessageBox.warning(self, "Empty API Key", "Please enter an API key to save.")
             return
-        
         try:
-            # Save the API key to the system keyring
             keyring.set_password(APP_NAME, KEY_NAME, api_key)
-            
             QMessageBox.information(self, "Success", "API key saved securely to your system!")
-            
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save API key: {str(e)}")
     
     def auto_save_preferences(self):
-        """Automatically save preferences when user makes a selection."""
-        # Only save if all combo boxes are populated and API is connected
         if (self.voice_combo.count() > 0 and 
             self.model_combo.count() > 0 and 
             self.format_combo.count() > 0 and
@@ -1083,26 +828,17 @@ class ElevenLabsBatchConverter(QMainWindow):
             self.save_preferences()
     
     def save_preferences(self):
-        """Save current preferences to the system keyring."""
         try:
-            # Save general preferences
             if self.voice_combo.currentData():
                 keyring.set_password(APP_NAME, VOICE_KEY, self.voice_combo.currentData())
-            
             if self.model_combo.currentData():
                 keyring.set_password(APP_NAME, MODEL_KEY, self.model_combo.currentData())
-            
             if self.format_combo.currentData():
                 keyring.set_password(APP_NAME, FORMAT_KEY, self.format_combo.currentData())
-            
-            # Save voice-specific settings if a voice is selected
             voice_id = self.voice_combo.currentData()
             if voice_id:
-                # Create or update settings for this voice
                 if voice_id not in self.voice_settings:
                     self.voice_settings[voice_id] = {}
-                
-                # Store current settings
                 self.voice_settings[voice_id] = {
                     'stability': self.stability_slider.value() / 100.0,
                     'similarity_boost': self.similarity_slider.value() / 100.0,
@@ -1110,67 +846,45 @@ class ElevenLabsBatchConverter(QMainWindow):
                     'speaker_boost': self.speaker_boost_checkbox.isChecked(),
                     'remove_silence': self.remove_noise_checkbox.isChecked()
                 }
-                
-                # Save all voice settings
                 self.save_voice_settings()
-            
             logger.info("Saved preferences to keyring")
         except Exception as e:
             logger.error(f"Error saving preferences: {str(e)}")
     
     def connect_api(self):
-        """Initialize the ElevenLabs API with the current key and load voices."""
         api_key = self.api_key_input.text().strip()
         if not api_key:
             QMessageBox.warning(self, "Empty API Key", "Please enter your ElevenLabs API key.")
             return
-        
         self.status_label.setText("Connecting to ElevenLabs API...")
         QApplication.processEvents()
-        
         try:
-            # Initialize API with the provided key
             self.api = ElevenLabsAPI(api_key=api_key)
-            
-            # Update credits display
             self.update_credits_display()
-            
-            # Load voices
             self.load_voices()
-            
-            # Enable controls that require the API
             self.start_btn.setEnabled(True)
             self.voice_combo.setEnabled(True)
             self.refresh_voices_btn.setEnabled(True)
-            
         except ValueError as e:
-            QMessageBox.critical(self, "API Key Error", 
-                               f"Error initializing ElevenLabs API: {str(e)}")
+            QMessageBox.critical(self, "API Key Error", f"Error initializing ElevenLabs API: {str(e)}")
             self.status_label.setText("API connection failed. Check your key.")
     
     def update_credits_display(self):
-        """Update the credits display with current information from the API."""
         if not self.api:
             self.credits_label.setText("Credits: Not connected")
             return
-            
         try:
             credits_info = self.api.get_remaining_credits()
             if credits_info:
-                # Format the credits display
                 tier = credits_info.get("tier", "Unknown")
                 used = credits_info.get("character_count", 0)
                 limit = credits_info.get("character_limit", 0)
                 remaining = credits_info.get("remaining_characters", 0)
-                
-                # Create a formatted string with the credits information
                 credits_text = f"Credits: {remaining:,} / {limit:,} characters remaining ({tier} tier)"
                 self.credits_label.setText(credits_text)
-                
-                # Change color based on remaining credits
-                if remaining < limit * 0.1:  # Less than 10% remaining
+                if remaining < limit * 0.1:
                     self.credits_label.setStyleSheet("color: red;")
-                elif remaining < limit * 0.25:  # Less than 25% remaining
+                elif remaining < limit * 0.25:
                     self.credits_label.setStyleSheet("color: orange;")
                 else:
                     self.credits_label.setStyleSheet("color: green;")
@@ -1183,116 +897,70 @@ class ElevenLabsBatchConverter(QMainWindow):
             self.credits_label.setStyleSheet("")
     
     def load_voices(self):
-        """Load available voices from the API."""
         if not self.api:
             return
-            
         self.status_label.setText("Loading voices...")
         QApplication.processEvents()
-        
         try:
-            # Temporarily disconnect all auto-save signals
-            # First check if signals are connected before disconnecting
             try:
                 self.voice_combo.currentIndexChanged.disconnect(self.load_voice_specific_settings)
             except TypeError:
-                # Signal was not connected
                 pass
-                
             try:
                 self.voice_combo.currentIndexChanged.disconnect(self.auto_save_preferences)
             except TypeError:
-                # Signal was not connected
                 pass
-                
             try:
                 self.model_combo.currentIndexChanged.disconnect(self.auto_save_preferences)
             except TypeError:
-                # Signal was not connected
                 pass
-                
             try:
                 self.format_combo.currentIndexChanged.disconnect(self.auto_save_preferences)
             except TypeError:
-                # Signal was not connected
                 pass
-            
-            # Load voices
             self.voices = self.api.get_voice_options()
             self.voice_combo.clear()
-            
             if not self.voices:
                 self.status_label.setText("No voices found. Check your API key and connection.")
                 return
-                
-            # Track if we found the saved voice
             found_saved_voice = False
             saved_voice_index = 0
-
             for i, voice in enumerate(self.voices):
                 self.voice_combo.addItem(voice["name"], voice["id"])
-                # If this is the previously saved voice, note its index
                 if voice["id"] == self.saved_voice_id:
                     found_saved_voice = True
                     saved_voice_index = i
-            
-            # Load models
             self.model_combo.clear()
             models = self.api.get_model_options()
-            
-            # Track if we found the saved model
             found_saved_model = False
             saved_model_index = 0
-            
             for i, model in enumerate(models):
                 self.model_combo.addItem(model["name"], model["id"])
-                # If this is the previously saved model, note its index
                 if model["id"] == self.saved_model_id:
                     found_saved_model = True
                     saved_model_index = i
-            
-            # Set the saved output format if it exists
             if self.saved_output_format:
-                # Temporarily disconnect to prevent triggering auto-save
                 try:
                     self.format_combo.currentIndexChanged.disconnect(self.auto_save_preferences)
                 except TypeError:
                     pass
-                    
                 for i in range(self.format_combo.count()):
                     if self.format_combo.itemData(i) == self.saved_output_format:
                         self.format_combo.setCurrentIndex(i)
                         break
-                        
-                # Reconnect the signal
                 self.format_combo.currentIndexChanged.connect(self.auto_save_preferences)
-            
-            # Update credits display after loading voices
             self.update_credits_display()
-            
-            # Reconnect signals in the correct order - first load settings, then auto-save
             self.voice_combo.currentIndexChanged.connect(self.load_voice_specific_settings)
             self.voice_combo.currentIndexChanged.connect(self.auto_save_preferences)
             self.model_combo.currentIndexChanged.connect(self.auto_save_preferences)
-            
             self.status_label.setText(f"Loaded {len(self.voices)} voices and {len(models)} models")
-            
-            # Now that signals are connected, set the current selections
-            # This will trigger the signals to load settings and save preferences in the correct order
-            
-            # Set the saved model if found - do this first to avoid unnecessary updates
             if found_saved_model:
                 self.model_combo.setCurrentIndex(saved_model_index)
-                
-            # Set the saved voice if found - this will trigger loading voice-specific settings
             if found_saved_voice:
                 self.voice_combo.setCurrentIndex(saved_voice_index)
             else:
-                # If no saved voice was found, manually load default settings
                 self.load_voice_specific_settings()
-            
         except Exception as e:
-            # Ensure signals are reconnected even if there's an error
             try:
                 self.voice_combo.currentIndexChanged.connect(self.load_voice_specific_settings)
                 self.voice_combo.currentIndexChanged.connect(self.auto_save_preferences)
@@ -1304,98 +972,61 @@ class ElevenLabsBatchConverter(QMainWindow):
             logger.error(f"Error loading voices: {str(e)}")
     
     def add_files(self):
-        """Open file dialog to select audio files."""
         files, _ = QFileDialog.getOpenFileNames(
             self,
             "Select Audio Files",
             "",
             "Audio Files (*.mp3 *.wav *.ogg *.flac *.m4a);;All Files (*)"
         )
-        
         for file_path in files:
             self.file_list._add_file(file_path)
-        
-        # Update indices after adding files
         self.file_list.update_indices()
     
     def remove_selected_file(self):
-        """Remove the selected file from the list."""
         selected_items = self.file_list.selectedItems()
         for item in selected_items:
-            # Stop playback if the item has a widget
             widget = self.file_list.itemWidget(item)
             if widget and isinstance(widget, AudioFileWidget):
                 widget.stop()
-            
             self.file_list.takeItem(self.file_list.row(item))
-        
-        # Update indices after removing files
         self.file_list.update_indices()
     
     def clear_files(self):
-        """Clear all files from the list."""
-        # Stop playback for all items
         for i in range(self.file_list.count()):
             widget = self.file_list.itemWidget(self.file_list.item(i))
             if widget and isinstance(widget, AudioFileWidget):
                 widget.stop()
-        
         self.file_list.clear()
-        # No need to update indices after clearing as there are no items left
     
     def update_stability_label(self, value):
-        """Update the stability label when the slider changes."""
         stability_value = value / 100.0
         self.stability_label.setText(f"Stability: {stability_value:.2f}")
     
     def update_similarity_label(self, value):
-        """Update the similarity boost label when the slider changes."""
         similarity_value = value / 100.0
         self.similarity_label.setText(f"Similarity Boost: {similarity_value:.2f}")
     
     def update_style_label(self, value):
-        """Update the style exaggeration label when the slider changes."""
         style_value = value / 100.0
         self.style_label.setText(f"Style Exaggeration: {style_value:.2f}")
     
     def start_conversion(self):
-        """Start the batch conversion process."""
         if self.file_list.count() == 0:
             QMessageBox.warning(self, "No Files", "Please add files to convert.")
             return
-            
         if self.voice_combo.count() == 0:
             QMessageBox.warning(self, "No Voice Selected", "Please select a voice for conversion.")
             return
-            
-        # Get the selected voice ID
         voice_id = self.voice_combo.currentData()
-        
-        # Get the selected model ID
         model_id = self.model_combo.currentData()
-        
-        # Get the speaker boost and noise removal settings
         speaker_boost = self.speaker_boost_checkbox.isChecked()
         remove_background_noise = self.remove_noise_checkbox.isChecked()
-        
-        # Get the voice model settings
         stability = self.stability_slider.value() / 100.0
         similarity_boost = self.similarity_slider.value() / 100.0
         style = self.style_slider.value() / 100.0
-        
-        # Get the selected output format
         output_format = self.format_combo.currentData()
-        
-        # Preferences are already auto-saved when selections change, no need to save here
-        
-        # Get all file paths from the list
-        file_paths = [self.file_list.item(i).data(Qt.ItemDataRole.UserRole) 
-                     for i in range(self.file_list.count())]
-        
-        # Clear previous results
+        file_paths = [self.file_list.item(i).data(Qt.ItemDataRole.UserRole) for i in range(self.file_list.count())]
         self.results_list.clear()
-        
-        # Update UI
         self.status_label.setText("Converting...")
         self.progress_bar.setValue(0)
         self.start_btn.setEnabled(False)
@@ -1412,8 +1043,6 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.style_slider.setEnabled(False)
         self.refresh_voices_btn.setEnabled(False)
         self.cancel_btn.setEnabled(True)
-        
-        # Create and start worker thread
         self.worker = ConversionWorker(
             self.api, 
             voice_id, 
@@ -1432,59 +1061,40 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.worker.start()
     
     def cancel_conversion(self):
-        """Cancel the current conversion process."""
         if self.worker and self.worker.isRunning():
             self.worker.cancel()
             self.status_label.setText("Cancelling...")
             self.cancel_btn.setEnabled(False)
     
     def update_progress(self, current, total):
-        """Update the progress bar."""
         progress_percent = int((current / total) * 100) if total > 0 else 0
         self.progress_bar.setValue(progress_percent)
         self.status_label.setText(f"Converting file {current+1} of {total}")
     
     def add_conversion_result(self, file_path, success, token_info):
-        """Add a conversion result to the results list."""
         file_name = os.path.basename(file_path)
         item = QListWidgetItem()
-        
-        # Ellipsify the filename
         ellipsified_name = self.ellipsify_filename(file_name, 30)
-        
-        # Format token information
         token_text = ""
         if success and token_info:
             if 'characters_used' in token_info:
                 token_text = f" ({token_info['characters_used']} chars)"
             elif 'estimated_characters' in token_info:
                 token_text = f" (~{token_info['estimated_characters']} chars)"
-        
         if success:
             item.setText(f"✓ {ellipsified_name}{token_text}")
             item.setForeground(Qt.GlobalColor.darkGreen)
-            
-            # Update credits display after each successful conversion
             self.update_credits_display()
-            
-            # Process events to ensure UI updates
             QApplication.processEvents()
         else:
             item.setText(f"✗ {ellipsified_name}")
             item.setForeground(Qt.GlobalColor.red)
-        
         item.setData(Qt.ItemDataRole.UserRole, file_path)
         self.results_list.addItem(item)
-        
-        # Ensure the latest item is visible
         self.results_list.scrollToItem(item)
     
     def conversion_finished(self):
-        """Handle the completion of all conversions."""
-        # Set progress bar to 100%
         self.progress_bar.setValue(100)
-        
-        # Re-enable UI elements
         self.start_btn.setEnabled(True)
         self.add_files_btn.setEnabled(True)
         self.remove_file_btn.setEnabled(True)
@@ -1499,213 +1109,141 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.style_slider.setEnabled(True)
         self.refresh_voices_btn.setEnabled(True)
         self.cancel_btn.setEnabled(False)
-        
-        # Credits display is already updated after each successful conversion
-        
-        # Count successful and failed conversions
         success_count = 0
         failed_count = 0
-        
         for i in range(self.results_list.count()):
             item = self.results_list.item(i)
             if "✓" in item.text():
                 success_count += 1
             else:
                 failed_count += 1
-        
-        # Update status
         if failed_count == 0:
             self.status_label.setText(f"Conversion complete! {success_count} files converted successfully.")
         else:
-            self.status_label.setText(
-                f"Conversion complete with issues. {success_count} succeeded, {failed_count} failed."
-            )
-            
-        # Show a message box with the results
+            self.status_label.setText(f"Conversion complete with issues. {success_count} succeeded, {failed_count} failed.")
         QMessageBox.information(
             self,
             "Conversion Complete",
-            f"Conversion process finished.\n\n"
-            f"Successfully converted: {success_count} files\n"
-            f"Failed conversions: {failed_count} files\n\n"
-            f"Output files are saved in the 'output' folder with their original filenames."
+            f"Conversion process finished.\n\nSuccessfully converted: {success_count} files\nFailed conversions: {failed_count} files\n\nOutput files are saved in the 'output' folder with their original filenames."
         )
-        
-        # Clean up the worker
         if self.worker:
             self.worker.deleteLater()
             self.worker = None
     
     def open_output_folder(self):
-        """Open the output folder in file explorer."""
         output_dir = Path("output")
         output_dir.mkdir(exist_ok=True)
-        
-        # Use OS-specific command to open folder
         os.startfile(output_dir)
-
+    
     def dragEnterEvent(self, event: QDragEnterEvent):
-        """Forward drag enter events to the file list widget."""
         if self.file_list:
             self.file_list.dragEnterEvent(event)
     
     def dragMoveEvent(self, event):
-        """Forward drag move events to the file list widget."""
         if self.file_list:
             self.file_list.dragMoveEvent(event)
     
     def dropEvent(self, event: QDropEvent):
-        """Forward drop events to the file list widget."""
         if self.file_list:
             self.file_list.dropEvent(event)
-
+    
     def closeEvent(self, event):
-        """Handle the window close event."""
-        # Stop all audio playback
         for i in range(self.file_list.count()):
             widget = self.file_list.itemWidget(self.file_list.item(i))
             if widget and isinstance(widget, AudioFileWidget):
                 widget.stop()
-        
-        # Accept the close event
         event.accept()
-
+    
     def ellipsify_filename(self, filename, max_length=30):
-        """Ellipsify a filename while preserving the extension."""
         if len(filename) <= max_length:
             return filename
-        
-        # Split the filename into name and extension
         name, ext = os.path.splitext(filename)
-        
-        # Calculate how many characters we can keep from the name
-        # We need to account for the ellipsis "..." (3 chars) and the extension
         chars_to_keep = max_length - 3 - len(ext)
-        
-        # If we can't even fit a single character plus ellipsis plus extension,
-        # just truncate the whole thing
         if chars_to_keep < 1:
             return filename[:max_length-3] + "..."
-        
-        # Otherwise, keep the start of the name, add ellipsis, and keep the extension
         return name[:chars_to_keep] + "..." + ext
-
+    
     def load_voice_settings(self):
-        """Load all saved voice-specific settings from keyring."""
         try:
-            # Get saved voice settings from keyring
             settings_json = keyring.get_password(APP_NAME, VOICE_SETTINGS_KEY)
             if settings_json:
                 self.voice_settings = json.loads(settings_json)
             else:
                 self.voice_settings = {}
-                
             logger.info(f"Loaded settings for {len(self.voice_settings)} voices")
         except Exception as e:
             logger.error(f"Error loading voice settings: {str(e)}")
             self.voice_settings = {}
-
+    
     def save_voice_settings(self):
-        """Save all voice-specific settings to keyring."""
         try:
-            # Convert voice settings dictionary to JSON and save
             settings_json = json.dumps(self.voice_settings)
             keyring.set_password(APP_NAME, VOICE_SETTINGS_KEY, settings_json)
             logger.info(f"Saved settings for {len(self.voice_settings)} voices")
         except Exception as e:
             logger.error(f"Error saving voice settings: {str(e)}")
-
+    
     def load_voice_specific_settings(self):
-        """Load settings specific to the currently selected voice."""
         voice_id = self.voice_combo.currentData()
         if not voice_id:
             return
-            
         try:
-            # Temporarily disconnect signals to prevent loops
             try:
                 self.stability_slider.valueChanged.disconnect(self.auto_save_preferences)
             except TypeError:
                 pass
-                
             try:
                 self.similarity_slider.valueChanged.disconnect(self.auto_save_preferences)
             except TypeError:
                 pass
-                
             try:
                 self.style_slider.valueChanged.disconnect(self.auto_save_preferences)
             except TypeError:
                 pass
-                
             try:
                 self.speaker_boost_checkbox.stateChanged.disconnect(self.auto_save_preferences)
             except TypeError:
                 pass
-                
             try:
                 self.remove_noise_checkbox.stateChanged.disconnect(self.auto_save_preferences)
             except TypeError:
                 pass
-            
-            # Check if we have saved settings for this voice
             if voice_id in self.voice_settings:
-                # Load saved settings for this voice
                 settings = self.voice_settings[voice_id]
-                
-                # Apply voice model settings
                 if 'stability' in settings:
                     value = int(float(settings['stability']) * 100)
                     self.stability_slider.setValue(value)
                     self.update_stability_label(value)
-                    
                 if 'similarity_boost' in settings:
                     value = int(float(settings['similarity_boost']) * 100)
                     self.similarity_slider.setValue(value)
                     self.update_similarity_label(value)
-                    
                 if 'style' in settings:
                     value = int(float(settings['style']) * 100)
                     self.style_slider.setValue(value)
                     self.update_style_label(value)
-                    
-                # Apply checkbox settings
                 if 'speaker_boost' in settings:
                     self.speaker_boost_checkbox.setChecked(settings['speaker_boost'])
-                    
                 if 'remove_silence' in settings:
                     self.remove_noise_checkbox.setChecked(settings['remove_silence'])
-                
                 logger.info(f"Loaded settings for voice {voice_id}")
             else:
-                # Apply default settings for this voice
-                # These match the initial values set in init_ui
-                self.stability_slider.setValue(50)  # 0.5
+                self.stability_slider.setValue(50)
                 self.update_stability_label(50)
-                
-                self.similarity_slider.setValue(75)  # 0.75
+                self.similarity_slider.setValue(75)
                 self.update_similarity_label(75)
-                
-                self.style_slider.setValue(0)  # 0.0
+                self.style_slider.setValue(0)
                 self.update_style_label(0)
-                
                 self.speaker_boost_checkbox.setChecked(True)
                 self.remove_noise_checkbox.setChecked(False)
-                
                 logger.info(f"Applied default settings for new voice {voice_id}")
-                
-                # Save these default settings for the voice
                 self.save_preferences()
-            
-            # Reconnect signals
             self.stability_slider.valueChanged.connect(self.auto_save_preferences)
             self.similarity_slider.valueChanged.connect(self.auto_save_preferences)
             self.style_slider.valueChanged.connect(self.auto_save_preferences)
             self.speaker_boost_checkbox.stateChanged.connect(self.auto_save_preferences)
             self.remove_noise_checkbox.stateChanged.connect(self.auto_save_preferences)
-            
         except Exception as e:
-            # Make sure signals are reconnected if there's an error
             try:
                 self.stability_slider.valueChanged.connect(self.auto_save_preferences)
                 self.similarity_slider.valueChanged.connect(self.auto_save_preferences)
@@ -1717,108 +1255,65 @@ class ElevenLabsBatchConverter(QMainWindow):
             logger.error(f"Error loading voice settings: {str(e)}")
 
 def create_logo_file():
-    """Create a logo file for the application if it doesn't exist."""
     logo_dir = Path("resources")
     logo_dir.mkdir(exist_ok=True)
-    
     logo_path = logo_dir / "logo.png"
-    
-    # Only create the logo if it doesn't exist
     if not logo_path.exists():
         try:
-            # Create a pixmap for the logo
             logo_pixmap = QPixmap(200, 200)
             logo_pixmap.fill(Qt.GlobalColor.transparent)
-            
-            # Create a painter to draw on the pixmap
             painter = QPainter(logo_pixmap)
-            
-            # Draw a circular background
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor("#2c3e50"))  # Dark blue background
+            painter.setBrush(QColor("#2c3e50"))
             painter.drawEllipse(25, 25, 150, 150)
-            
-            # Create a microphone icon
             mic_icon = qta.icon('fa5s.microphone-alt', color='#3498db')
             mic_pixmap = mic_icon.pixmap(100, 100)
-            
-            # Create a sound wave icon
             wave_icon = qta.icon('fa5s.wave-square', color='#2ecc71')
             wave_pixmap = wave_icon.pixmap(80, 80)
-            
-            # Paint both icons onto the pixmap
-            painter.drawPixmap(50, 30, mic_pixmap)  # Position the microphone
-            painter.drawPixmap(60, 110, wave_pixmap)  # Position the wave below
-            
-            # Add "ElevenLabs" text
+            painter.drawPixmap(50, 30, mic_pixmap)
+            painter.drawPixmap(60, 110, wave_pixmap)
             painter.setPen(QColor("white"))
             font = QFont()
             font.setPointSize(12)
             font.setBold(True)
             painter.setFont(font)
             painter.drawText(50, 180, "ElevenLabs")
-            
             painter.end()
-            
-            # Save the pixmap to a file
             logo_pixmap.save(str(logo_path))
             logger.info(f"Created logo file at {logo_path}")
-            
             return True
         except Exception as e:
             logger.error(f"Error creating logo file: {str(e)}")
             return False
-    
     return True
 
 def main():
-    """Main application entry point."""
-    # In Qt6 high DPI scaling is enabled by default.
-    # Optionally, set high DPI pixmap usage if available.
     if hasattr(Qt.ApplicationAttribute, "AA_UseHighDpiPixmaps"):
         QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
-    
     app = QApplication(sys.argv)
-    app.setStyle("Fusion")  # Use Fusion style for a modern look
-
-    # Set application icon
+    app.setStyle("Fusion")
     app_icon = qta.icon('fa5s.microphone-alt', color='#3498db')
     app.setWindowIcon(app_icon)
-
-    # Create main window but don't show it yet
     window = ElevenLabsBatchConverter()
-
-    # Create and show splash screen
     splash = SplashScreen()
     splash.show()
-
-    # Chain non-blocking timer calls to update splash messages
     QTimer.singleShot(500, lambda: splash.showMessage("Initializing application...", Qt.AlignmentFlag.AlignCenter))
-    
-    # Create resources after showing the first message
     def create_resources():
         splash.showMessage("Creating resources...", Qt.AlignmentFlag.AlignCenter)
         create_logo_file()
     QTimer.singleShot(1000, create_resources)
-    
     QTimer.singleShot(1500, lambda: splash.showMessage("Creating user interface...", Qt.AlignmentFlag.AlignCenter))
     QTimer.singleShot(2000, lambda: splash.showMessage("Checking for saved credentials...", Qt.AlignmentFlag.AlignCenter))
-    
-    # Set up file system after checking credentials
     def setup_filesystem():
         splash.showMessage("Setting up file system...", Qt.AlignmentFlag.AlignCenter)
         output_dir = Path("output")
         output_dir.mkdir(exist_ok=True)
     QTimer.singleShot(2500, setup_filesystem)
-    
     QTimer.singleShot(3000, lambda: splash.showMessage("Ready to launch!", Qt.AlignmentFlag.AlignCenter))
-
-    # After the splash sequence, finish splash and show the main window
     def finish_splash():
         splash.finish(window)
         window.show()
     QTimer.singleShot(3500, finish_splash)
-
     sys.exit(app.exec())
 
 if __name__ == "__main__":
