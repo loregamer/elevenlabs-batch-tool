@@ -520,6 +520,12 @@ class ConversionWorker(QThread):
                 if self.output_format.startswith("mp3"):
                     output_ext = ".mp3"
                     format_info = self.output_format.split("_")[-1] + "kbps"  # Extract bitrate
+                elif self.output_format.startswith("flac"):
+                    output_ext = ".flac"
+                    bit_depth = 16
+                    if "24" in self.output_format:
+                        bit_depth = 24
+                    format_info = f"{bit_depth}bit"
                 elif self.output_format.startswith("pcm"):
                     output_ext = ".wav"
                     # Extract the bit depth from the format string
@@ -563,6 +569,9 @@ class ConversionWorker(QThread):
                     # Fix WAV files for Wwise compatibility
                     if output_ext.lower() == ".wav":
                         self._fix_wav_format(output_path, bit_depth)
+                    elif output_ext.lower() == ".flac":
+                        # FLAC files don't need fixing, they're already lossless
+                        logger.info(f"FLAC format selected for {output_path}")
                     
                     self.conversion_complete.emit(str(output_path), True, token_info or {})
                 else:
@@ -899,6 +908,8 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.format_combo.addItem("MP3 (44.1kHz, 128kbps)", "mp3_44100_128")
         self.format_combo.addItem("MP3 (44.1kHz, 192kbps)", "mp3_44100_192")
         self.format_combo.addItem("MP3 (44.1kHz, 256kbps)", "mp3_44100_256")
+        self.format_combo.addItem("FLAC (16-bit, 44.1kHz)", "flac_16")
+        self.format_combo.addItem("FLAC (24-bit, 44.1kHz)", "flac_24")
         self.format_combo.addItem("WAV (16-bit, 44.1kHz)", "pcm_16000")
         self.format_combo.addItem("WAV (24-bit, 44.1kHz)", "pcm_24000")
         self.format_combo.addItem("WAV (32-bit, 44.1kHz - Wwise Compatible)", "pcm_32000")
