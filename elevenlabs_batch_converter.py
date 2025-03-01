@@ -17,6 +17,7 @@ import qtawesome as qta
 import mutagen
 from mutagen.wave import WAVE
 import time
+from pydub import AudioSegment
 
 from elevenlabs_api import ElevenLabsAPI
 
@@ -468,6 +469,28 @@ class ConversionWorker(QThread):
         self.output_format = output_format
         self.is_cancelled = False
     
+    def _fix_wav_format(self, file_path, bit_depth=32):
+        """Convert to proper WAV format for Wwise compatibility"""
+        try:
+            # Use pydub to load and convert the audio
+            audio = AudioSegment.from_file(file_path)
+            
+            # Set sample width based on bit depth (1 = 8bit, 2 = 16bit, 3 = 24bit, 4 = 32bit)
+            sample_width = 4  # Default to 32-bit for Wwise
+            if bit_depth == 16:
+                sample_width = 2
+            elif bit_depth == 24:
+                sample_width = 3
+                
+            # Export with proper WAV headers
+            audio = audio.set_sample_width(sample_width)
+            audio.export(file_path, format="wav")
+            logger.info(f"Successfully fixed WAV format for {file_path}")
+            return True
+        except Exception as e:
+            logger.error(f"Error fixing WAV format: {str(e)}")
+            return False
+    
     def run(self):
         """Execute the conversion process for each file."""
         total_files = len(self.file_list)
@@ -494,8 +517,19 @@ class ConversionWorker(QThread):
                     format_info = self.output_format.split("_")[-1] + "kbps"  # Extract bitrate
                 elif self.output_format.startswith("pcm"):
                     output_ext = ".wav"
-                    bit_depth = "16bit" if "16000" in self.output_format else "24bit"
-                    format_info = bit_depth
+                    # Extract the bit depth from the format string
+                    if "16000" in self.output_format:
+                        bit_depth = 16
+                        format_info = "16bit"
+                    elif "24000" in self.output_format:
+                        bit_depth = 24
+                        format_info = "24bit"
+                    elif "32000" in self.output_format:
+                        bit_depth = 32
+                        format_info = "32bit"
+                    else:
+                        bit_depth = 32  # Use 32-bit as a safe default for compatibility
+                        format_info = "32bit"
                 else:
                     # Default to mp3 if format is unknown
                     output_ext = ".mp3"
@@ -520,6 +554,10 @@ class ConversionWorker(QThread):
                     # Save the converted audio
                     with open(output_path, "wb") as f:
                         f.write(audio_data)
+                    
+                    # Fix WAV files for Wwise compatibility
+                    if output_ext.lower() == ".wav":
+                        self._fix_wav_format(output_path, bit_depth)
                     
                     self.conversion_complete.emit(str(output_path), True, token_info or {})
                 else:
@@ -844,10 +882,12 @@ class ElevenLabsBatchConverter(QMainWindow):
         self.format_combo.addItem("MP3 (44.1kHz, 256kbps)", "mp3_44100_256")
         self.format_combo.addItem("WAV (16-bit, 44.1kHz)", "pcm_16000")
         self.format_combo.addItem("WAV (24-bit, 44.1kHz)", "pcm_24000")
+        self.format_combo.addItem("WAV (32-bit, 44.1kHz - Wwise Compatible)", "pcm_32000")
         self.format_combo.setCurrentIndex(0)  # Default to MP3 128kbps
         self.format_combo.setToolTip("Select the output audio format and quality.\n"
                                     "MP3: Smaller file size, good for most uses.\n"
-                                    "WAV: Lossless quality, larger file size.")
+                                    "WAV: Lossless quality, larger file size.\n"
+                                    "32-bit WAV is recommended for Wwise compatibility.")
         voice_layout.addWidget(self.format_combo)
         
         # Add voice model settings group
